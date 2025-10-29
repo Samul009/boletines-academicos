@@ -1,0 +1,23 @@
+# Ignorar archivos innecesarios para el build
+node_modules
+.git
+*.log
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Ignorar archivos del servidor
+../Servidor
+../api
+api/
+server/
+
+# Ignorar archivos de testing
+**/__tests__/**
+**/*.test.*
+**/*.spec.*
+
+# Ignorar documentación
+*.md
+!README.md
