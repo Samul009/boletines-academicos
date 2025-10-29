@@ -29,6 +29,22 @@ from app.routes import auth
 from app.core.database import Base, engine
 from app.models import *  # Importar todos los modelos para crear tablas
 
+# Crear tablas automáticamente al iniciar
+@app.on_event("startup")
+async def startup_event():
+    """Crear tablas y datos iniciales al iniciar la aplicación"""
+    try:
+        # Crear todas las tablas
+        Base.metadata.create_all(bind=engine)
+        print("✅ Tablas creadas correctamente")
+        
+        # Ejecutar migración de datos esenciales
+        from migrate_data import migrate_data
+        migrate_data()
+        
+    except Exception as e:
+        print(f"⚠️ Error en startup: {e}")
+
 
 
 
