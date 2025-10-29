@@ -26,8 +26,8 @@ from app.routes import notificacion_route
 from app.routes import recuperacion_contrasena_route
 
 from app.routes import auth
-from app.core.database import Base
-from app.core.database import engine
+from app.core.database import Base, engine
+from app.models import *  # Importar todos los modelos para crear tablas
 
 
 
@@ -38,10 +38,16 @@ app = FastAPI(title="Sistema de Boletines Academicos")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # En entorno de desarrollo se acepta cualquier origen; en producción se recomienda restringir
-    allow_credentials=True, # Habilita el uso de cookies o autenticación
-    allow_methods=["*"],    # Métodos HTTP permitidos
-    allow_headers=["*"],    # Encabezados permitidos
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001", 
+        "http://localhost:5173",  # Vite dev server
+        "https://*.netlify.app",  # Netlify deployments
+        "https://*.vercel.app",   # Vercel deployments
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Health check endpoint

@@ -1,14 +1,15 @@
 # requirements.txt
 fastapi
-uvicorn
+uvicorn[standard]
 sqlalchemy
 pydantic
+pydantic-settings
 PyJWT
 python-multipart
 passlib[bcrypt]
-pymysql
+psycopg2-binary
 python-dotenv
-openpyxls
+openpyxl
 sendgrid
 pandas 
 jinja2     
