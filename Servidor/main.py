@@ -29,18 +29,29 @@ from app.routes import auth
 from app.core.database import Base, engine
 from app.models import *  # Importar todos los modelos para crear tablas
 
+# Crear la aplicación FastAPI
+app = FastAPI(title="Sistema de Boletines Academicos")
+
 # Crear tablas automáticamente al iniciar
 @app.on_event("startup")
 async def startup_event():
     """Crear tablas y datos iniciales al iniciar la aplicación"""
     try:
-        # Crear todas las tablas
-        Base.metadata.create_all(bind=engine)
-        print("✅ Tablas creadas correctamente")
+        from app.core.config import get_settings
+        settings = get_settings()
         
-        # Ejecutar migración de datos esenciales
-        from migrate_data import migrate_data
-        migrate_data()
+        # Solo ejecutar migración si es PostgreSQL (producción)
+        if "postgresql" in settings.DATABASE_URL.lower():
+            print("🔄 Detectado PostgreSQL - Ejecutando migración...")
+            # Crear todas las tablas
+            Base.metadata.create_all(bind=engine)
+            print("✅ Tablas creadas correctamente")
+            
+            # Ejecutar migración de datos esenciales
+            from migrate_data import migrate_data
+            migrate_data()
+        else:
+            print("🏠 Detectado MySQL local - Sin migración")
         
     except Exception as e:
         print(f"⚠️ Error en startup: {e}")
@@ -49,8 +60,6 @@ async def startup_event():
 
 
 
-
-app = FastAPI(title="Sistema de Boletines Academicos")
 
 app.add_middleware(
     CORSMiddleware,
