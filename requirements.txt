@@ -1,2 +1,15 @@
-# Este archivo redirige a la carpeta Servidor
--r Servidor/requirements.txt
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+pydantic-settings
+PyJWT
+python-multipart
+passlib[bcrypt]
+psycopg2-binary
+python-dotenv
+openpyxl
+sendgrid
+pandas 
+jinja2     
+certifi
