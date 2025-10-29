@@ -1,0 +1,2 @@
+# Este archivo redirige a la carpeta Servidor
+-r Servidor/requirements.txt
