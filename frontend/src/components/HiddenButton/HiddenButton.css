@@ -1,0 +1,86 @@
+.hidden-developer-button {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  z-index: 1000;
+  opacity: 0.1;
+  transition: opacity var(--transition-normal);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hidden-developer-button:hover {
+  opacity: 0.7;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.hidden-developer-button:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.hidden-developer-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: var(--text-disabled);
+  border-radius: 50%;
+  transition: all var(--transition-normal);
+}
+
+.hidden-developer-button:hover::before {
+  background: var(--primary-color);
+  width: 12px;
+  height: 12px;
+}
+
+/* Animación sutil para indicar interactividad */
+.hidden-developer-button::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  transition: all var(--transition-normal);
+}
+
+.hidden-developer-button:hover::after {
+  border-color: var(--primary-color);
+  opacity: 0.3;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hidden-developer-button {
+    bottom: 15px;
+    left: 15px;
+    width: 35px;
+    height: 35px;
+  }
+  
+  .hidden-developer-button::before {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .hidden-developer-button:hover::before {
+    width: 10px;
+    height: 10px;
+  }
+}

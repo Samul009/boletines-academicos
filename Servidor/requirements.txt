@@ -1,0 +1,16 @@
+# requirements.txt
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+PyJWT
+python-multipart
+passlib[bcrypt]
+pymysql
+python-dotenv
+openpyxls
+sendgrid
+pandas 
+jinja2     
+certifi
+  

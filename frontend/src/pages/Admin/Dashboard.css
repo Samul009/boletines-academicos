@@ -1,0 +1,26 @@
+/* Usar los mismos estilos base del developer dashboard */
+@import '../Developer/Dashboard.css';
+
+/* Personalización para admin */
+.admin-dashboard .admin-logo {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-dashboard .admin-logo .material-icons {
+  font-size: 1.5rem;
+  color: white;
+}
+
+.admin-dashboard .dashboard-header {
+  border-color: var(--primary-color);
+}
+
+.admin-dashboard .dashboard-section h2 {
+  color: var(--primary-color);
+}

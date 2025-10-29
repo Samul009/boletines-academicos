@@ -1,0 +1,214 @@
+.developer-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md);
+}
+
+.developer-panel__content {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-xl);
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-heavy);
+  width: 100%;
+}
+
+.developer-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--text-disabled);
+}
+
+.developer-panel__header h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-xl);
+}
+
+.developer-panel__close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+  transition: var(--transition-normal);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.developer-panel__close:hover {
+  background-color: var(--error);
+  color: white;
+}
+
+.developer-panel__section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.developer-panel__section h3 {
+  color: var(--primary-color);
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--spacing-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.developer-panel__info-grid {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm);
+  background-color: var(--bg-primary);
+  border-radius: var(--border-radius-sm);
+}
+
+.info-label {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.info-value {
+  font-family: 'Courier New', monospace;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.info-value.status {
+  font-weight: var(--font-weight-semibold);
+}
+
+.developer-panel__permissions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  max-height: 150px;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+  background-color: var(--bg-primary);
+  border-radius: var(--border-radius-sm);
+}
+
+.permission-tag {
+  background-color: var(--primary-color);
+  color: white;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.developer-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.dev-action-btn {
+  background-color: var(--info);
+  color: white;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.dev-action-btn:hover {
+  background-color: #1976D2;
+  transform: translateY(-1px);
+}
+
+.dev-action-btn:active {
+  transform: translateY(0);
+}
+
+.dev-action-btn.login-btn {
+  background-color: var(--institutional-purple);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.dev-action-btn.login-btn:hover {
+  background-color: #5e35b1;
+}
+
+.dev-action-btn.logout-btn {
+  background-color: var(--error);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.dev-action-btn.logout-btn:hover {
+  background-color: #d32f2f;
+}
+
+/* Scrollbar personalizado */
+.developer-panel__content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.developer-panel__content::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-radius: 3px;
+}
+
+.developer-panel__content::-webkit-scrollbar-thumb {
+  background: var(--text-disabled);
+  border-radius: 3px;
+}
+
+.developer-panel__content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .developer-panel {
+    padding: var(--spacing-sm);
+  }
+  
+  .developer-panel__content {
+    padding: var(--spacing-lg);
+    max-height: 90vh;
+  }
+  
+  .developer-panel__header h2 {
+    font-size: var(--font-size-lg);
+  }
+  
+  .developer-panel__actions {
+    flex-direction: column;
+  }
+  
+  .dev-action-btn {
+    width: 100%;
+  }
+}
