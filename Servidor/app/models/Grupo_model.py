@@ -27,6 +27,7 @@ class Grupo(GrupoBase):
     grado_nombre: Optional[str] = None
     jornada_nombre: Optional[str] = None
     anio_lectivo: Optional[int] = None
+    director_nombre: Optional[str] = None
     fecha_creacion: Optional[date] = None
     fecha_actualizacion: Optional[date] = None
     fecha_eliminacion: Optional[date] = None

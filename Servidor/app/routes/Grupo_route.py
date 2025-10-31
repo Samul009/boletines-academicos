@@ -21,20 +21,25 @@ router = APIRouter(prefix="/grupos", tags=["Grupos"])
 
 # Función de consulta base con joins para obtener contexto
 def _get_grupo_query(db: Session):
+    from ..models.models import Persona as PersonaDB
+    from sqlalchemy import func
     return db.query(
         GrupoDB,
         Grado.nombre_grado.label("grado_nombre"),
         JornadaDB.nombre.label("jornada_nombre"),
         AnioLectivo.anio.label("anio_lectivo"),
+        func.concat(PersonaDB.nombre, ' ', PersonaDB.apellido).label("director_nombre"),
     ).join(Grado, GrupoDB.id_grado == Grado.id_grado)\
      .join(JornadaDB, GrupoDB.id_jornada == JornadaDB.id_jornada)\
      .join(AnioLectivo, GrupoDB.id_anio_lectivo == AnioLectivo.id_anio_lectivo)\
+     .outerjoin(Usuario, GrupoDB.id_usuario_director == Usuario.id_usuario)\
+     .outerjoin(PersonaDB, Usuario.id_persona == PersonaDB.id_persona)\
      .filter(GrupoDB.fecha_eliminacion.is_(None))
 
 
 # Función para mapear el resultado de la consulta a GrupoModel
 def _map_grupo_result(result: tuple) -> GrupoModel:
-    grupo_db, grado_n, jornada_n, anio_n = result
+    grupo_db, grado_n, jornada_n, anio_n, director_n = result
     return GrupoModel(
         id_grupo=grupo_db.id_grupo,
         id_grado=grupo_db.id_grado,
@@ -47,6 +52,7 @@ def _map_grupo_result(result: tuple) -> GrupoModel:
         grado_nombre=grado_n,
         jornada_nombre=jornada_n,
         anio_lectivo=anio_n,
+        director_nombre=director_n,
         
         fecha_creacion=grupo_db.fecha_creacion.date() if grupo_db.fecha_creacion else None,
         fecha_actualizacion=grupo_db.fecha_actualizacion.date() if grupo_db.fecha_actualizacion else None,

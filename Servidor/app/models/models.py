@@ -100,6 +100,7 @@ class Persona(Base):
     matriculas = relationship("Matricula", back_populates="persona")
     calificaciones = relationship("Calificacion", back_populates="estudiante")
     fallas = relationship("Falla", back_populates="estudiante")
+    asignaturas_docente = relationship("DocenteAsignatura", back_populates="docente_persona")
 
 
 class Usuario(Base):
@@ -115,10 +116,10 @@ class Usuario(Base):
     fecha_eliminacion = Column(DateTime, nullable=True)
 
     persona = relationship("Persona", back_populates="usuario")
-    roles = relationship("Rol", secondary=usuario_rol, back_populates="usuarios", overlaps="usuarios,roles")
+    roles = relationship("Rol", secondary=usuario_rol, back_populates="usuarios", overlaps="rol_usuarios_directa,usuario_roles_directa")
     calificaciones = relationship("Calificacion", back_populates="docente")
     grupos_dirigidos = relationship("Grupo", back_populates="director")
-    asignaturas_docente = relationship("DocenteAsignatura", back_populates="docente")
+    # asignaturas_docente eliminado: DocenteAsignatura ahora referencia persona directamente
     
     __mapper_args__ = {}
 
@@ -131,9 +132,8 @@ class Rol(Base):
     fecha_creacion = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
     fecha_actualizacion = Column(DateTime, nullable=True)
     fecha_eliminacion = Column(DateTime, nullable=True)
-    overlaps="roles,usuarios"  # ← SOLUCIONA EL WARNING
 
-    usuarios = relationship("Usuario", secondary=usuario_rol, back_populates="roles")
+    usuarios = relationship("Usuario", secondary=usuario_rol, back_populates="roles", overlaps="rol_usuarios_directa,usuario_roles_directa")
     permisos = relationship("Permiso", back_populates="rol")
 
 
@@ -190,6 +190,7 @@ class AnioLectivo(Base):
     matriculas = relationship("Matricula", back_populates="anio_lectivo")
     calificaciones = relationship("Calificacion", back_populates="anio_lectivo")
     asignaturas_docente = relationship("DocenteAsignatura", back_populates="anio_lectivo")
+    asignaturas_grado = relationship("GradoAsignatura", back_populates="anio_lectivo")
 
 
 class PeriodoAcademico(Base):
@@ -220,6 +221,8 @@ class Grado(Base):
     fecha_eliminacion = Column(DateTime, nullable=True)
 
     grupos = relationship("Grupo", back_populates="grado")
+    asignaturas_grado = relationship("GradoAsignatura", back_populates="grado")
+    asignaturas_docente = relationship("DocenteAsignatura", back_populates="grado")
 
 
 class Jornada(Base):
@@ -287,6 +290,7 @@ class Asignatura(Base):
     calificaciones = relationship("Calificacion", back_populates="asignatura")
     fallas = relationship("Falla", back_populates="asignatura")
     asignaturas_docente = relationship("DocenteAsignatura", back_populates="asignatura")
+    asignaturas_grado = relationship("GradoAsignatura", back_populates="asignatura")
 
 
 class Calificacion(Base):
@@ -333,20 +337,43 @@ class Falla(Base):
 class DocenteAsignatura(Base):
     __tablename__ = "docente_asignatura"
     id_docente_asignatura = Column(Integer, primary_key=True)
-    id_usuario_docente = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    id_persona_docente = Column(Integer, ForeignKey("persona.id_persona"), nullable=True)  # ✅ Cambiado a persona
     id_asignatura = Column(Integer, ForeignKey("asignatura.id_asignatura"), nullable=False)
-    id_grupo = Column(Integer, ForeignKey("grupo.id_grupo"), nullable=False)
-    id_anio_lectivo = Column(Integer, ForeignKey("anio_lectivo.id_anio_lectivo"), nullable=False)
+    id_grado = Column(Integer, ForeignKey("grado.id_grado"), nullable=True)  # ✅ Ahora es opcional
+    id_grupo = Column(Integer, ForeignKey("grupo.id_grupo"), nullable=True, comment="NULL = aplica a todos los grupos del grado. Valor = aplica solo a ese grupo")
+    id_anio_lectivo = Column(Integer, ForeignKey("anio_lectivo.id_anio_lectivo"), nullable=True)  # ✅ Ahora es opcional
     fecha_creacion = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
     fecha_actualizacion = Column(DateTime, nullable=True)
     fecha_eliminacion = Column(DateTime, nullable=True)
 
-    docente = relationship("Usuario", back_populates="asignaturas_docente")
+    docente_persona = relationship("Persona", foreign_keys=[id_persona_docente], back_populates="asignaturas_docente")  # ✅ Relación con Persona
     asignatura = relationship("Asignatura", back_populates="asignaturas_docente")
+    grado = relationship("Grado", back_populates="asignaturas_docente")
     grupo = relationship("Grupo", back_populates="asignaturas_docente")
     anio_lectivo = relationship("AnioLectivo", back_populates="asignaturas_docente")
 
-    __table_args__ = (UniqueConstraint('id_usuario_docente', 'id_asignatura', 'id_grupo', 'id_anio_lectivo', name='uk_docente_asig'),)
+    __table_args__ = (
+        UniqueConstraint('id_persona_docente', 'id_asignatura', 'id_grado', 'id_grupo', 'id_anio_lectivo', name='uk_docente_asignatura_completo'),
+    )
+
+
+class GradoAsignatura(Base):
+    __tablename__ = "grado_asignatura"
+    id_grado_asignatura = Column(Integer, primary_key=True)
+    id_grado = Column(Integer, ForeignKey("grado.id_grado"), nullable=False)
+    id_asignatura = Column(Integer, ForeignKey("asignatura.id_asignatura"), nullable=False)
+    id_anio_lectivo = Column(Integer, ForeignKey("anio_lectivo.id_anio_lectivo"), nullable=False)
+    intensidad_horaria = Column(Integer, nullable=True, comment="Intensidad horaria específica para este grado (opcional)")
+    fecha_creacion = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
+    fecha_actualizacion = Column(DateTime, nullable=True)
+    fecha_eliminacion = Column(DateTime, nullable=True)
+
+    grado = relationship("Grado", back_populates="asignaturas_grado")
+    asignatura = relationship("Asignatura", back_populates="asignaturas_grado")
+    anio_lectivo = relationship("AnioLectivo", back_populates="asignaturas_grado")
+
+    __table_args__ = (UniqueConstraint('id_grado', 'id_asignatura', 'id_anio_lectivo', name='uk_grado_asignatura_anio'),)
+
 
 class RecuperacionContrasena(Base):
     __tablename__ = "recuperacion_contrasena"
@@ -376,8 +403,8 @@ class UsuarioRol(Base):
 
     # Relaciones (NUEVO: Para cargar el objeto Usuario y Rol)
     # Nota: Las relaciones 'usuario' y 'rol' ya las tenías, pero las reafirmo.
-    usuario_obj = relationship("Usuario", backref="usuario_roles_directa", foreign_keys=[id_usuario])
-    rol_obj = relationship("Rol", backref="rol_usuarios_directa", foreign_keys=[id_rol])
+    usuario_obj = relationship("Usuario", backref="usuario_roles_directa", foreign_keys=[id_usuario], overlaps="roles,usuarios")
+    rol_obj = relationship("Rol", backref="rol_usuarios_directa", foreign_keys=[id_rol], overlaps="roles,usuarios")
 
 
 class Imagen(Base):

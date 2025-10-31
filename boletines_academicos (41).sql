@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Servidor: 127.0.0.1
--- Tiempo de generación: 29-10-2025 a las 01:57:25
+-- Tiempo de generación: 30-10-2025 a las 21:53:19
 -- Versión del servidor: 10.4.32-MariaDB
 -- Versión de PHP: 8.0.30
 
@@ -44,7 +44,8 @@ CREATE TABLE `anio_lectivo` (
 
 INSERT INTO `anio_lectivo` (`id_anio_lectivo`, `anio`, `fecha_inicio`, `fecha_fin`, `id_estado`, `fecha_creacion`, `fecha_actualizacion`, `fecha_eliminacion`) VALUES
 (1, 2025, '2025-01-01', '2025-12-31', 1, '2025-10-23 22:40:49', NULL, NULL),
-(2, 2024, '2024-01-01', '2024-12-31', 2, '2025-10-23 22:40:49', NULL, NULL);
+(2, 2024, '2024-01-01', '2024-12-31', 2, '2025-10-23 22:40:49', NULL, NULL),
+(3, 2026, '2026-01-21', '2026-11-18', 3, '2025-10-30 00:14:06', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -71,7 +72,8 @@ INSERT INTO `asignatura` (`id_asignatura`, `nombre_asignatura`, `intensidad_hora
 (3, 'Ciencias Naturales', 4, '2025-10-23 22:56:58', NULL, NULL),
 (4, 'Ciencias Sociales', 4, '2025-10-23 22:56:58', NULL, NULL),
 (5, 'Educación Física', 3, '2025-10-23 22:56:58', NULL, NULL),
-(6, 'Inglés', 3, '2025-10-23 22:56:58', NULL, NULL);
+(6, 'Inglés', 3, '2025-10-23 22:56:58', NULL, NULL),
+(7, 'mate', 3, '2025-10-29 06:31:23', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -168,10 +170,11 @@ INSERT INTO `departamento` (`id_departamento`, `id_pais`, `nombre`, `fecha_creac
 
 CREATE TABLE `docente_asignatura` (
   `id_docente_asignatura` int(11) NOT NULL,
-  `id_usuario_docente` int(11) NOT NULL,
   `id_asignatura` int(11) NOT NULL,
-  `id_grupo` int(11) NOT NULL,
-  `id_anio_lectivo` int(11) NOT NULL,
+  `id_persona_docente` int(11) DEFAULT NULL,
+  `id_grado` int(11) DEFAULT NULL,
+  `id_grupo` int(11) DEFAULT NULL,
+  `id_anio_lectivo` int(11) DEFAULT NULL,
   `fecha_creacion` datetime DEFAULT current_timestamp(),
   `fecha_actualizacion` datetime DEFAULT NULL,
   `fecha_eliminacion` datetime DEFAULT NULL
@@ -181,13 +184,60 @@ CREATE TABLE `docente_asignatura` (
 -- Volcado de datos para la tabla `docente_asignatura`
 --
 
-INSERT INTO `docente_asignatura` (`id_docente_asignatura`, `id_usuario_docente`, `id_asignatura`, `id_grupo`, `id_anio_lectivo`, `fecha_creacion`, `fecha_actualizacion`, `fecha_eliminacion`) VALUES
-(1, 2, 1, 1, 1, '2025-10-23 22:40:50', NULL, NULL),
-(2, 2, 2, 1, 1, '2025-10-23 22:40:50', NULL, NULL),
-(3, 3, 1, 2, 1, '2025-10-23 22:40:50', NULL, NULL),
-(4, 3, 3, 2, 1, '2025-10-23 22:40:50', NULL, NULL),
-(5, 4, 4, 3, 1, '2025-10-23 22:40:50', NULL, NULL),
-(6, 5, 5, 4, 1, '2025-10-23 22:40:50', NULL, NULL);
+INSERT INTO `docente_asignatura` (`id_docente_asignatura`, `id_asignatura`, `id_persona_docente`, `id_grado`, `id_grupo`, `id_anio_lectivo`, `fecha_creacion`, `fecha_actualizacion`, `fecha_eliminacion`) VALUES
+(35, 2, 9, NULL, NULL, NULL, '2025-10-30 13:48:01', NULL, NULL),
+(36, 2, 2, NULL, NULL, NULL, '2025-10-30 13:48:33', NULL, NULL),
+(37, 2, 19, NULL, NULL, NULL, '2025-10-30 13:48:33', NULL, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `docente_asignatura_new`
+--
+
+CREATE TABLE `docente_asignatura_new` (
+  `id_docente_asignatura` int(11) NOT NULL,
+  `id_usuario_docente` int(11) NOT NULL,
+  `id_asignatura` int(11) NOT NULL,
+  `id_grado` int(11) NOT NULL,
+  `id_grupo` int(11) DEFAULT NULL COMMENT 'NULL = aplica a todos los grupos del grado. Valor = aplica solo a ese grupo',
+  `id_anio_lectivo` int(11) NOT NULL,
+  `fecha_creacion` datetime DEFAULT current_timestamp(),
+  `fecha_actualizacion` datetime DEFAULT NULL,
+  `fecha_eliminacion` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `docente_estado`
+--
+
+CREATE TABLE `docente_estado` (
+  `id_docente_estado` int(11) NOT NULL,
+  `id_usuario_docente` int(11) NOT NULL,
+  `scope` enum('GLOBAL','ASIGNATURA','GRADO','GRADO_ASIGNATURA','GRUPO') NOT NULL DEFAULT 'GLOBAL',
+  `id_asignatura` int(11) DEFAULT NULL,
+  `id_grado` int(11) DEFAULT NULL,
+  `id_grupo` int(11) DEFAULT NULL,
+  `id_anio_lectivo` int(11) DEFAULT NULL,
+  `activo` tinyint(1) NOT NULL,
+  `fecha_inicio` datetime NOT NULL DEFAULT current_timestamp(),
+  `fecha_fin` datetime DEFAULT NULL,
+  `observacion` varchar(255) DEFAULT NULL,
+  `fecha_creacion` datetime NOT NULL DEFAULT current_timestamp(),
+  `fecha_actualizacion` datetime DEFAULT NULL,
+  `fecha_eliminacion` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Volcado de datos para la tabla `docente_estado`
+--
+
+INSERT INTO `docente_estado` (`id_docente_estado`, `id_usuario_docente`, `scope`, `id_asignatura`, `id_grado`, `id_grupo`, `id_anio_lectivo`, `activo`, `fecha_inicio`, `fecha_fin`, `observacion`, `fecha_creacion`, `fecha_actualizacion`, `fecha_eliminacion`) VALUES
+(2, 7, 'GRADO', NULL, 4, NULL, NULL, 0, '2025-10-30 03:05:49', NULL, NULL, '2025-10-30 03:05:49', NULL, NULL),
+(3, 7, 'GRADO_ASIGNATURA', 3, 4, NULL, NULL, 0, '2025-10-30 03:06:26', NULL, NULL, '2025-10-30 03:06:26', NULL, NULL),
+(5, 7, 'GRADO_ASIGNATURA', 3, 4, NULL, NULL, 0, '2025-10-30 03:11:06', NULL, NULL, '2025-10-30 03:11:06', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -269,7 +319,44 @@ INSERT INTO `grado` (`id_grado`, `nombre_grado`, `nivel`, `fecha_creacion`, `fec
 (3, 'Tercero', 'primaria', '2025-10-23 23:01:57', NULL, NULL),
 (4, 'Cuarto', 'primaria', '2025-10-23 23:01:57', NULL, NULL),
 (5, 'Quinto', 'primaria', '2025-10-23 23:01:57', NULL, NULL),
-(6, 'Sexto', 'secundaria', '2025-10-23 23:01:57', NULL, NULL);
+(6, 'Sexto', 'secundaria', '2025-10-23 23:01:57', NULL, '2025-10-28 22:09:21');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `grado_asignatura`
+--
+
+CREATE TABLE `grado_asignatura` (
+  `id_grado_asignatura` int(11) NOT NULL,
+  `id_grado` int(11) DEFAULT NULL,
+  `id_asignatura` int(11) DEFAULT NULL,
+  `id_anio_lectivo` int(11) DEFAULT NULL,
+  `intensidad_horaria` int(11) DEFAULT NULL COMMENT 'Intensidad horaria específica para este grado (opcional)',
+  `fecha_creacion` datetime DEFAULT current_timestamp(),
+  `fecha_actualizacion` datetime DEFAULT NULL,
+  `fecha_eliminacion` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Relación entre grados y asignaturas por año lectivo. Permite definir qué asignaturas se imparten en cada grado.';
+
+--
+-- Volcado de datos para la tabla `grado_asignatura`
+--
+
+INSERT INTO `grado_asignatura` (`id_grado_asignatura`, `id_grado`, `id_asignatura`, `id_anio_lectivo`, `intensidad_horaria`, `fecha_creacion`, `fecha_actualizacion`, `fecha_eliminacion`) VALUES
+(1, 1, 3, 3, 2, '2025-10-30 01:47:46', '2025-10-30 11:42:13', NULL),
+(2, 4, 1, 3, 2, '2025-10-30 01:49:03', NULL, '2025-10-30 15:01:33'),
+(3, 4, 2, 3, 2, '2025-10-30 01:49:04', NULL, '2025-10-30 15:01:33'),
+(4, 4, 3, 3, 2, '2025-10-30 01:49:04', NULL, '2025-10-30 15:01:33'),
+(5, 4, 4, 3, 2, '2025-10-30 01:49:04', NULL, '2025-10-30 15:01:33'),
+(6, 4, 5, 3, 2, '2025-10-30 01:49:04', NULL, '2025-10-30 15:01:34'),
+(7, 4, 6, 3, 2, '2025-10-30 01:49:04', NULL, '2025-10-30 15:01:34'),
+(8, 4, 7, 3, 2, '2025-10-30 01:49:04', NULL, '2025-10-30 15:01:34'),
+(9, 4, 2, 1, 2, '2025-10-30 10:17:36', '2025-10-30 15:02:08', NULL),
+(10, 4, 3, 1, 2, '2025-10-30 10:17:36', '2025-10-30 15:02:08', NULL),
+(11, 4, 4, 1, 2, '2025-10-30 10:17:36', '2025-10-30 15:02:08', NULL),
+(12, 5, 2, 1, 2, '2025-10-30 14:36:14', NULL, NULL),
+(13, 2, 2, 1, 2, '2025-10-30 14:46:16', NULL, NULL),
+(14, 3, 2, 1, 2, '2025-10-30 14:47:04', '2025-10-30 15:40:02', NULL);
 
 -- --------------------------------------------------------
 
@@ -378,7 +465,10 @@ INSERT INTO `matricula` (`id_matricula`, `id_persona`, `id_grupo`, `id_anio_lect
 (9, 13, 3, 1, 1, '2025-01-10', '2025-10-23 22:40:50', NULL, NULL),
 (10, 14, 4, 1, 1, '2025-01-10', '2025-10-23 22:40:50', NULL, NULL),
 (11, 15, 4, 1, 1, '2025-01-10', '2025-10-23 22:40:50', NULL, NULL),
-(12, 16, 4, 1, 1, '2025-01-10', '2025-10-23 22:40:50', NULL, NULL);
+(12, 16, 4, 1, 1, '2025-01-10', '2025-10-23 22:40:50', NULL, NULL),
+(13, 28, 4, 1, 1, '2025-10-29', '2025-10-29 05:21:41', NULL, NULL),
+(14, 15, 1, 1, 1, '2025-10-29', '2025-10-29 08:38:27', NULL, NULL),
+(15, 17, 1, 1, 1, '2025-10-30', '2025-10-30 11:20:32', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -444,7 +534,8 @@ INSERT INTO `paginas` (`id_pagina`, `nombre`, `ruta`, `visible`) VALUES
 (31, 'Usuarios y qué rol tiene', '/usuario-rol', 1),
 (32, 'Notas y boletines', '/notas', 1),
 (33, 'Boletines', '/boletin', 1),
-(34, 'Lista de Asistencia', '/asistencia', 1);
+(34, 'Lista de Asistencia', '/asistencia', 1),
+(35, 'Mi perfil\r\n', '/mi-perfil', 1);
 
 -- --------------------------------------------------------
 
@@ -493,9 +584,9 @@ CREATE TABLE `periodo_academico` (
 --
 
 INSERT INTO `periodo_academico` (`id_periodo`, `id_anio_lectivo`, `nombre_periodo`, `fecha_inicio`, `fecha_fin`, `estado`, `fecha_creacion`, `fecha_actualizacion`, `fecha_eliminacion`) VALUES
-(1, 1, 'Primer Periodo', '2025-01-01', '2025-03-31', 'activo', '2025-10-23 22:40:50', NULL, NULL),
+(1, 1, 'Primer Periodo1', '2025-01-01', '2025-03-31', 'activo', '2025-10-23 22:40:50', '2025-10-28 22:08:43', NULL),
 (2, 1, 'Segundo Periodo', '2025-04-01', '2025-06-30', 'pendiente', '2025-10-23 22:40:50', NULL, NULL),
-(3, 1, 'Tercer Periodo', '2025-07-01', '2025-09-30', 'pendiente', '2025-10-23 22:40:50', NULL, NULL),
+(3, 1, 'Tercer Periodo3', '2025-07-01', '2025-09-30', 'pendiente', '2025-10-23 22:40:50', '2025-10-28 22:08:57', NULL),
 (4, 1, 'Cuarto Periodo', '2025-10-01', '2025-12-31', 'pendiente', '2025-10-23 22:40:50', NULL, NULL);
 
 -- --------------------------------------------------------
@@ -624,7 +715,8 @@ INSERT INTO `persona` (`id_persona`, `foto`, `nombre`, `apellido`, `id_tipoident
 (23, NULL, 'Felipe', 'Patiño', 2, '1000000019', '2010-04-05', 'M', 2, NULL, NULL, NULL, '2025-10-23 22:40:50', NULL, NULL),
 (24, NULL, 'Lucía', 'Cárdenas', 2, '1000000020', '2011-08-27', 'F', 2, NULL, NULL, NULL, '2025-10-23 22:40:50', NULL, NULL),
 (25, NULL, 'Samuel', 'giron', 1, '111111', '2015-10-31', 'M', 8, '3130000000', 'eyok142@gmail.com', NULL, '2025-10-24 21:57:24', NULL, NULL),
-(27, NULL, 'Da', 'vi', 1, '1111111', '2015-10-21', 'M', 8, NULL, NULL, NULL, '2025-10-28 17:01:48', NULL, NULL);
+(27, NULL, 'Da', 'vi', 1, '1111111', '2015-10-21', 'M', 8, NULL, NULL, NULL, '2025-10-28 17:01:48', NULL, NULL),
+(28, NULL, 'mira', 'flores', 2, '112312', '2010-02-25', 'F', 8, '12321', '', NULL, '2025-10-29 05:21:12', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -855,10 +947,40 @@ ALTER TABLE `departamento`
 --
 ALTER TABLE `docente_asignatura`
   ADD PRIMARY KEY (`id_docente_asignatura`),
-  ADD UNIQUE KEY `uk_docente_asig` (`id_usuario_docente`,`id_asignatura`,`id_grupo`,`id_anio_lectivo`),
+  ADD UNIQUE KEY `uk_da_persona_asig_grado_grupo_anio` (`id_persona_docente`,`id_asignatura`,`id_grado`,`id_grupo`,`id_anio_lectivo`),
   ADD KEY `id_asignatura` (`id_asignatura`),
   ADD KEY `id_grupo` (`id_grupo`),
+  ADD KEY `id_anio_lectivo` (`id_anio_lectivo`),
+  ADD KEY `idx_da_persona` (`id_persona_docente`),
+  ADD KEY `idx_da_asig_grado_anio` (`id_asignatura`,`id_grado`,`id_anio_lectivo`),
+  ADD KEY `idx_da_asig` (`id_asignatura`),
+  ADD KEY `idx_da_grado` (`id_grado`),
+  ADD KEY `idx_da_grupo` (`id_grupo`),
+  ADD KEY `idx_da_anio` (`id_anio_lectivo`);
+
+--
+-- Indices de la tabla `docente_asignatura_new`
+--
+ALTER TABLE `docente_asignatura_new`
+  ADD PRIMARY KEY (`id_docente_asignatura`),
+  ADD UNIQUE KEY `uk_docente_asignatura_completo` (`id_usuario_docente`,`id_asignatura`,`id_grado`,`id_grupo`,`id_anio_lectivo`),
+  ADD KEY `id_asignatura` (`id_asignatura`),
+  ADD KEY `id_grado` (`id_grado`),
+  ADD KEY `id_grupo` (`id_grupo`),
   ADD KEY `id_anio_lectivo` (`id_anio_lectivo`);
+
+--
+-- Indices de la tabla `docente_estado`
+--
+ALTER TABLE `docente_estado`
+  ADD PRIMARY KEY (`id_docente_estado`),
+  ADD KEY `idx_docente_estado_docente` (`id_usuario_docente`),
+  ADD KEY `idx_docente_estado_scope` (`scope`,`id_asignatura`,`id_grado`,`id_grupo`,`id_anio_lectivo`),
+  ADD KEY `idx_docente_estado_vigente` (`activo`,`fecha_inicio`,`fecha_fin`),
+  ADD KEY `fk_docente_estado_asignatura` (`id_asignatura`),
+  ADD KEY `fk_docente_estado_grado` (`id_grado`),
+  ADD KEY `fk_docente_estado_grupo` (`id_grupo`),
+  ADD KEY `fk_docente_estado_anio` (`id_anio_lectivo`);
 
 --
 -- Indices de la tabla `estado_anio_lectivo`
@@ -882,6 +1004,16 @@ ALTER TABLE `falla`
 ALTER TABLE `grado`
   ADD PRIMARY KEY (`id_grado`),
   ADD UNIQUE KEY `nombre_grado` (`nombre_grado`);
+
+--
+-- Indices de la tabla `grado_asignatura`
+--
+ALTER TABLE `grado_asignatura`
+  ADD PRIMARY KEY (`id_grado_asignatura`),
+  ADD UNIQUE KEY `uk_grado_asignatura_anio` (`id_grado`,`id_asignatura`,`id_anio_lectivo`),
+  ADD KEY `id_grado` (`id_grado`),
+  ADD KEY `id_asignatura` (`id_asignatura`),
+  ADD KEY `id_anio_lectivo` (`id_anio_lectivo`);
 
 --
 -- Indices de la tabla `grupo`
@@ -1020,13 +1152,13 @@ ALTER TABLE `usuario_rol`
 -- AUTO_INCREMENT de la tabla `anio_lectivo`
 --
 ALTER TABLE `anio_lectivo`
-  MODIFY `id_anio_lectivo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id_anio_lectivo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT de la tabla `asignatura`
 --
 ALTER TABLE `asignatura`
-  MODIFY `id_asignatura` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id_asignatura` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT de la tabla `calificacion`
@@ -1050,7 +1182,19 @@ ALTER TABLE `departamento`
 -- AUTO_INCREMENT de la tabla `docente_asignatura`
 --
 ALTER TABLE `docente_asignatura`
-  MODIFY `id_docente_asignatura` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id_docente_asignatura` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=38;
+
+--
+-- AUTO_INCREMENT de la tabla `docente_asignatura_new`
+--
+ALTER TABLE `docente_asignatura_new`
+  MODIFY `id_docente_asignatura` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de la tabla `docente_estado`
+--
+ALTER TABLE `docente_estado`
+  MODIFY `id_docente_estado` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT de la tabla `estado_anio_lectivo`
@@ -1069,6 +1213,12 @@ ALTER TABLE `falla`
 --
 ALTER TABLE `grado`
   MODIFY `id_grado` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT de la tabla `grado_asignatura`
+--
+ALTER TABLE `grado_asignatura`
+  MODIFY `id_grado_asignatura` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT de la tabla `grupo`
@@ -1092,7 +1242,7 @@ ALTER TABLE `jornada`
 -- AUTO_INCREMENT de la tabla `matricula`
 --
 ALTER TABLE `matricula`
-  MODIFY `id_matricula` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id_matricula` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT de la tabla `notificacion`
@@ -1104,7 +1254,7 @@ ALTER TABLE `notificacion`
 -- AUTO_INCREMENT de la tabla `paginas`
 --
 ALTER TABLE `paginas`
-  MODIFY `id_pagina` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+  MODIFY `id_pagina` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=36;
 
 --
 -- AUTO_INCREMENT de la tabla `pais`
@@ -1128,7 +1278,7 @@ ALTER TABLE `permisos`
 -- AUTO_INCREMENT de la tabla `persona`
 --
 ALTER TABLE `persona`
-  MODIFY `id_persona` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `id_persona` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
 -- AUTO_INCREMENT de la tabla `recuperacion_contrasena`
@@ -1196,10 +1346,31 @@ ALTER TABLE `departamento`
 -- Filtros para la tabla `docente_asignatura`
 --
 ALTER TABLE `docente_asignatura`
-  ADD CONSTRAINT `docente_asignatura_ibfk_1` FOREIGN KEY (`id_usuario_docente`) REFERENCES `usuario` (`id_usuario`),
   ADD CONSTRAINT `docente_asignatura_ibfk_2` FOREIGN KEY (`id_asignatura`) REFERENCES `asignatura` (`id_asignatura`),
-  ADD CONSTRAINT `docente_asignatura_ibfk_3` FOREIGN KEY (`id_grupo`) REFERENCES `grupo` (`id_grupo`),
-  ADD CONSTRAINT `docente_asignatura_ibfk_4` FOREIGN KEY (`id_anio_lectivo`) REFERENCES `anio_lectivo` (`id_anio_lectivo`);
+  ADD CONSTRAINT `fk_da_anio` FOREIGN KEY (`id_anio_lectivo`) REFERENCES `anio_lectivo` (`id_anio_lectivo`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_da_grado` FOREIGN KEY (`id_grado`) REFERENCES `grado` (`id_grado`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_da_grupo` FOREIGN KEY (`id_grupo`) REFERENCES `grupo` (`id_grupo`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_da_persona` FOREIGN KEY (`id_persona_docente`) REFERENCES `persona` (`id_persona`) ON UPDATE CASCADE;
+
+--
+-- Filtros para la tabla `docente_asignatura_new`
+--
+ALTER TABLE `docente_asignatura_new`
+  ADD CONSTRAINT `docente_asignatura_new_ibfk_1` FOREIGN KEY (`id_usuario_docente`) REFERENCES `usuario` (`id_usuario`) ON DELETE CASCADE,
+  ADD CONSTRAINT `docente_asignatura_new_ibfk_2` FOREIGN KEY (`id_asignatura`) REFERENCES `asignatura` (`id_asignatura`) ON DELETE CASCADE,
+  ADD CONSTRAINT `docente_asignatura_new_ibfk_3` FOREIGN KEY (`id_grado`) REFERENCES `grado` (`id_grado`) ON DELETE CASCADE,
+  ADD CONSTRAINT `docente_asignatura_new_ibfk_4` FOREIGN KEY (`id_grupo`) REFERENCES `grupo` (`id_grupo`) ON DELETE CASCADE,
+  ADD CONSTRAINT `docente_asignatura_new_ibfk_5` FOREIGN KEY (`id_anio_lectivo`) REFERENCES `anio_lectivo` (`id_anio_lectivo`) ON DELETE CASCADE;
+
+--
+-- Filtros para la tabla `docente_estado`
+--
+ALTER TABLE `docente_estado`
+  ADD CONSTRAINT `fk_docente_estado_anio` FOREIGN KEY (`id_anio_lectivo`) REFERENCES `anio_lectivo` (`id_anio_lectivo`),
+  ADD CONSTRAINT `fk_docente_estado_asignatura` FOREIGN KEY (`id_asignatura`) REFERENCES `asignatura` (`id_asignatura`),
+  ADD CONSTRAINT `fk_docente_estado_grado` FOREIGN KEY (`id_grado`) REFERENCES `grado` (`id_grado`),
+  ADD CONSTRAINT `fk_docente_estado_grupo` FOREIGN KEY (`id_grupo`) REFERENCES `grupo` (`id_grupo`),
+  ADD CONSTRAINT `fk_docente_estado_usuario` FOREIGN KEY (`id_usuario_docente`) REFERENCES `usuario` (`id_usuario`);
 
 --
 -- Filtros para la tabla `falla`
@@ -1208,6 +1379,14 @@ ALTER TABLE `falla`
   ADD CONSTRAINT `falla_ibfk_1` FOREIGN KEY (`id_calificacion`) REFERENCES `calificacion` (`id_calificacion`),
   ADD CONSTRAINT `falla_ibfk_2` FOREIGN KEY (`id_persona`) REFERENCES `persona` (`id_persona`),
   ADD CONSTRAINT `falla_ibfk_3` FOREIGN KEY (`id_asignatura`) REFERENCES `asignatura` (`id_asignatura`);
+
+--
+-- Filtros para la tabla `grado_asignatura`
+--
+ALTER TABLE `grado_asignatura`
+  ADD CONSTRAINT `fk_grado_asignatura_anio` FOREIGN KEY (`id_anio_lectivo`) REFERENCES `anio_lectivo` (`id_anio_lectivo`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_grado_asignatura_asignatura` FOREIGN KEY (`id_asignatura`) REFERENCES `asignatura` (`id_asignatura`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_grado_asignatura_grado` FOREIGN KEY (`id_grado`) REFERENCES `grado` (`id_grado`) ON DELETE CASCADE;
 
 --
 -- Filtros para la tabla `grupo`

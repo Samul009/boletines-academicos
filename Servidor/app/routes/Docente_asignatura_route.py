@@ -14,7 +14,7 @@ from ..core.permissions import require_permission
 from ..models.models import (
     DocenteAsignatura, Usuario, Persona, Asignatura,
     Grupo, AnioLectivo, Grado, Matricula, Calificacion,
-    PeriodoAcademico,Falla
+    PeriodoAcademico, Falla, GradoAsignatura
 )
 
 # ==============================
@@ -55,19 +55,26 @@ class ClasePeriodoSchema(BaseModel):
 
 
 class DocenteAsignaturaBase(BaseModel):
-    id_usuario_docente: int
-    id_asignatura: int
-    id_grupo: int
-    id_anio_lectivo: int
+    id_persona_docente: Optional[int] = None  # ✅ Cambiado a persona, opcional
+    id_asignatura: int  # ✅ Obligatorio
+    id_grado: Optional[int] = None  # ✅ Ahora es opcional
+    id_grupo: Optional[int] = None  # ✅ NULLABLE: NULL = todos los grupos, valor = grupo específico
+    id_anio_lectivo: Optional[int] = None  # ✅ Ahora es opcional
 
 
-class DocenteAsignaturaModel(DocenteAsignaturaBase):
+class DocenteAsignaturaModel(BaseModel):
     id_docente_asignatura: int
+    id_persona_docente: Optional[int] = None  # ✅ Cambiado a persona
     docente_nombre: str
+    docente_identificacion: Optional[str] = None
+    id_asignatura: int  # ✅ Obligatorio
     asignatura_nombre: str
-    grupo_nombre: str
-    grado_nombre: str
-    anio_lectivo: int
+    id_grado: Optional[int] = None  # ✅ Opcional
+    grado_nombre: Optional[str] = None  # ✅ Opcional
+    id_grupo: Optional[int] = None  # ✅ Opcional
+    grupo_nombre: Optional[str] = None  # ✅ Opcional: solo si id_grupo tiene valor
+    id_anio_lectivo: Optional[int] = None  # ✅ Opcional
+    anio_lectivo: Optional[int] = None  # ✅ Opcional
     fecha_creacion: Optional[datetime] = None
     fecha_actualizacion: Optional[datetime] = None
     fecha_eliminacion: Optional[datetime] = None
@@ -81,9 +88,10 @@ class DocenteAsignaturaCreate(DocenteAsignaturaBase):
 
 
 class DocenteAsignaturaUpdate(BaseModel):
-    id_usuario_docente: Optional[int] = None
+    id_persona_docente: Optional[int] = None  # ✅ Cambiado a persona
     id_asignatura: Optional[int] = None
-    id_grupo: Optional[int] = None
+    id_grado: Optional[int] = None
+    id_grupo: Optional[int] = None  # ✅ Puede ser NULL para asignar a todos los grupos
     id_anio_lectivo: Optional[int] = None
 
 
@@ -141,6 +149,15 @@ def obtener_clase_con_notas_y_fallas(
     ).first()
     if not periodo:
         raise HTTPException(404, "Período no encontrado o no pertenece al año lectivo")
+    
+    # Obtener id_usuario del docente si existe (para filtrar calificaciones)
+    id_usuario_docente = None
+    if da.id_persona_docente:
+        usuario_docente = db.query(Usuario).filter(
+            Usuario.id_persona == da.id_persona_docente
+        ).first()
+        if usuario_docente:
+            id_usuario_docente = usuario_docente.id_usuario
 
     # Consulta principal: estudiantes + calificación + conteo de fallas
     stmt_estudiantes = (
@@ -161,7 +178,7 @@ def obtener_clase_con_notas_y_fallas(
                 Calificacion.id_asignatura == da.id_asignatura,
                 Calificacion.id_periodo == id_periodo,
                 Calificacion.id_anio_lectivo == da.id_anio_lectivo,
-                Calificacion.id_usuario == da.id_usuario_docente,
+                *([Calificacion.id_usuario == id_usuario_docente] if id_usuario_docente else []),
                 Calificacion.fecha_eliminacion.is_(None)
             )
         )
@@ -174,23 +191,39 @@ def obtener_clase_con_notas_y_fallas(
             )
         )
         .filter(
-            Matricula.id_grupo == da.id_grupo,
             Matricula.id_anio_lectivo == da.id_anio_lectivo,
             Matricula.activo == True,
             Matricula.fecha_eliminacion.is_(None),
             Persona.fecha_eliminacion.is_(None)
         )
-        .group_by(Persona.id_persona)
-        .order_by(Persona.apellido, Persona.nombre)
     )
+    
+    # Si id_grupo IS NULL → filtrar por todos los grupos del grado
+    # Si id_grupo tiene valor → filtrar solo por ese grupo
+    if da.id_grupo is None:
+        grupos_del_grado = db.query(Grupo.id_grupo).filter(
+            Grupo.id_grado == da.id_grado,
+            Grupo.id_anio_lectivo == da.id_anio_lectivo,
+            Grupo.fecha_eliminacion.is_(None)
+        ).all()
+        grupos_ids = [g[0] for g in grupos_del_grado]
+        stmt_estudiantes = stmt_estudiantes.filter(Matricula.id_grupo.in_(grupos_ids))
+    else:
+        stmt_estudiantes = stmt_estudiantes.filter(Matricula.id_grupo == da.id_grupo)
+    
+    stmt_estudiantes = stmt_estudiantes.group_by(Persona.id_persona).order_by(Persona.apellido, Persona.nombre)
 
     estudiantes_data = db.execute(stmt_estudiantes).all()
+
+    # Obtener información del grupo (puede ser NULL si es asignación por grado)
+    grupo_info = da.grupo if da.id_grupo else None
+    grupo_codigo = grupo_info.codigo_grupo if grupo_info else f"{da.grado.nombre_grado} (Todos)"
 
     return ClasePeriodoSchema(
         id_docente_asignatura=da.id_docente_asignatura,
         asignatura_nombre=da.asignatura.nombre_asignatura,
-        grupo_codigo=da.grupo.codigo_grupo,
-        grado_nombre=da.grupo.grado.nombre_grado,
+        grupo_codigo=grupo_codigo,
+        grado_nombre=da.grado.nombre_grado,
         anio_lectivo=da.anio_lectivo.anio,
         periodo_nombre=periodo.nombre_periodo,
         periodo_estado=periodo.estado,
@@ -211,60 +244,102 @@ def obtener_clase_con_notas_y_fallas(
 # 2️⃣ LISTAR ASIGNACIONES
 @router.get("/", response_model=List[DocenteAsignaturaModel])
 def listar_asignaciones(
-    docente_id: Optional[int] = Query(None, alias="usuario_docente_id"),
+    docente_id: Optional[int] = Query(None, alias="persona_docente_id"),
     asignatura_id: Optional[int] = Query(None),
-    grupo_id: Optional[int] = Query(None),
+    grado_id: Optional[int] = Query(None),
     anio_lectivo_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     user = Depends(require_permission("/docente-asignatura", "ver"))
 ):
-    PersonaDocente = aliased(Persona)
-    query = (
-        db.query(
-            DocenteAsignatura,
-            func.concat(PersonaDocente.nombre, ' ', PersonaDocente.apellido).label("docente_nombre"),
-            Asignatura.nombre_asignatura.label("asignatura_nombre"),
-            Grupo.codigo_grupo.label("grupo_nombre"),
-            Grado.nombre_grado.label("grado_nombre"),
-            AnioLectivo.anio.label("anio_lectivo")
-        )
-        .join(Usuario, DocenteAsignatura.id_usuario_docente == Usuario.id_usuario)
-        .join(PersonaDocente, Usuario.id_persona == PersonaDocente.id_persona)
-        .join(Asignatura, DocenteAsignatura.id_asignatura == Asignatura.id_asignatura)
-        .join(Grupo, DocenteAsignatura.id_grupo == Grupo.id_grupo)
-        .join(Grado, Grupo.id_grado == Grado.id_grado)
-        .join(AnioLectivo, DocenteAsignatura.id_anio_lectivo == AnioLectivo.id_anio_lectivo)
-        .filter(DocenteAsignatura.fecha_eliminacion.is_(None), Usuario.es_docente == True)
-    )
+    try:
+        PersonaDocente = aliased(Persona)
 
-    if docente_id:
-        query = query.filter(DocenteAsignatura.id_usuario_docente == docente_id)
-    if asignatura_id:
-        query = query.filter(DocenteAsignatura.id_asignatura == asignatura_id)
-    if grupo_id:
-        query = query.filter(DocenteAsignatura.id_grupo == grupo_id)
-    if anio_lectivo_id:
-        query = query.filter(DocenteAsignatura.id_anio_lectivo == anio_lectivo_id)
-
-    results = [
-        DocenteAsignaturaModel(
-            id_docente_asignatura=da.id_docente_asignatura,
-            id_usuario_docente=da.id_usuario_docente,
-            docente_nombre=docente_n,
-            id_asignatura=da.id_asignatura,
-            asignatura_nombre=asig_n,
-            id_grupo=da.id_grupo,
-            grupo_nombre=grupo_n,
-            id_anio_lectivo=da.id_anio_lectivo,
-            anio_lectivo=anio_n,
-            grado_nombre=grado_n,
-            fecha_creacion=da.fecha_creacion,
-            fecha_actualizacion=da.fecha_actualizacion,
-            fecha_eliminacion=da.fecha_eliminacion,
+        # Consulta principal
+        query = (
+            db.query(
+                DocenteAsignatura.id_docente_asignatura,
+                DocenteAsignatura.id_persona_docente,
+                DocenteAsignatura.id_asignatura,
+                DocenteAsignatura.id_grado,
+                DocenteAsignatura.id_grupo,
+                DocenteAsignatura.id_anio_lectivo,
+                DocenteAsignatura.fecha_creacion,
+                DocenteAsignatura.fecha_actualizacion,
+                DocenteAsignatura.fecha_eliminacion,
+                func.concat(PersonaDocente.nombre, ' ', PersonaDocente.apellido).label("docente_nombre"),
+                PersonaDocente.numero_identificacion.label("docente_identificacion"),
+                Asignatura.nombre_asignatura.label("asignatura_nombre"),
+                Grado.nombre_grado.label("grado_nombre"),
+                Grupo.codigo_grupo.label("grupo_nombre"),
+                AnioLectivo.anio.label("anio_lectivo")
+            )
+            .outerjoin(PersonaDocente, DocenteAsignatura.id_persona_docente == PersonaDocente.id_persona)
+            .join(Asignatura, DocenteAsignatura.id_asignatura == Asignatura.id_asignatura)
+            .outerjoin(Grado, DocenteAsignatura.id_grado == Grado.id_grado)
+            .outerjoin(Grupo, DocenteAsignatura.id_grupo == Grupo.id_grupo)
+            .outerjoin(AnioLectivo, DocenteAsignatura.id_anio_lectivo == AnioLectivo.id_anio_lectivo)
+            .filter(DocenteAsignatura.fecha_eliminacion.is_(None))
         )
-        for da, docente_n, asig_n, grupo_n, grado_n, anio_n in query.all()
-    ]
-    return results
+
+        if docente_id:
+            query = query.filter(DocenteAsignatura.id_persona_docente == docente_id)
+        if asignatura_id:
+            query = query.filter(DocenteAsignatura.id_asignatura == asignatura_id)
+        if grado_id:
+            query = query.filter(DocenteAsignatura.id_grado == grado_id)
+        if anio_lectivo_id:
+            query = query.filter(DocenteAsignatura.id_anio_lectivo == anio_lectivo_id)
+
+        raw_results = query.all()
+
+        results: List[DocenteAsignaturaModel] = []
+        for row in raw_results:
+            (
+                id_da,
+                id_persona,
+                id_asig,
+                id_grado,
+                id_grupo,
+                id_anio,
+                f_crea,
+                f_act,
+                f_elim,
+                docente_n,
+                docente_id_val,
+                asig_n,
+                grado_n,
+                grupo_n,
+                anio_n,
+            ) = row
+            results.append(
+                DocenteAsignaturaModel(
+                    id_docente_asignatura=id_da,
+                    id_persona_docente=id_persona,
+                    docente_nombre=docente_n or "",
+                    docente_identificacion=docente_id_val or None,
+                    id_asignatura=id_asig,
+                    asignatura_nombre=asig_n or f"ID: {id_asig}",
+                    id_grado=id_grado,
+                    id_grupo=id_grupo,
+                    grado_nombre=grado_n or (f"ID: {id_grado}" if id_grado else ""),
+                    grupo_nombre=grupo_n,
+                    id_anio_lectivo=id_anio,
+                    anio_lectivo=anio_n,
+                    fecha_creacion=f_crea,
+                    fecha_actualizacion=f_act,
+                    fecha_eliminacion=f_elim,
+                )
+            )
+
+        return results
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"❌ Error en listar_asignaciones: {e}")
+        traceback.print_exc()
+        return []
 
 
 # 3️⃣ OBTENER DETALLE DE CLASE
@@ -286,7 +361,26 @@ def obtener_clase_completa(
     if not da:
         raise HTTPException(404, "Clase no encontrada")
 
-    estudiantes = db.query(Persona).join(Matricula).filter(
+    # Si id_grupo IS NULL → obtener estudiantes de TODOS los grupos del grado
+    # Si id_grupo tiene valor → obtener estudiantes solo de ese grupo
+    if da.id_grupo is None:
+        # Obtener todos los grupos del grado y año
+        grupos_del_grado = db.query(Grupo.id_grupo).filter(
+            Grupo.id_grado == da.id_grado,
+            Grupo.id_anio_lectivo == da.id_anio_lectivo,
+            Grupo.fecha_eliminacion.is_(None)
+        ).all()
+        grupos_ids = [g[0] for g in grupos_del_grado]
+        
+        estudiantes = db.query(Persona).join(Matricula).filter(
+            Matricula.id_grupo.in_(grupos_ids),
+            Matricula.id_anio_lectivo == da.id_anio_lectivo,
+            Matricula.activo == True,
+            Matricula.fecha_eliminacion.is_(None),
+            Persona.fecha_eliminacion.is_(None)
+        ).all()
+    else:
+        estudiantes = db.query(Persona).join(Matricula).filter(
         Matricula.id_grupo == da.id_grupo,
         Matricula.id_anio_lectivo == da.id_anio_lectivo,
         Matricula.activo == True,
@@ -294,11 +388,15 @@ def obtener_clase_completa(
         Persona.fecha_eliminacion.is_(None)
     ).all()
 
+    # Obtener información del grupo (puede ser NULL si es asignación por grado)
+    grupo_info = da.grupo if da.id_grupo else None
+    grupo_codigo = grupo_info.codigo_grupo if grupo_info else f"{da.grado.nombre_grado} (Todos los grupos)"
+
     return ClaseInfoSchema(
         id_docente_asignatura=da.id_docente_asignatura,
         asignatura_nombre=da.asignatura.nombre_asignatura,
-        grupo_codigo=da.grupo.codigo_grupo,
-        grado_nombre=da.grupo.grado.nombre_grado,
+        grupo_codigo=grupo_codigo,
+        grado_nombre=da.grado.nombre_grado,
         anio_lectivo=da.anio_lectivo.anio,
         estudiantes=[EstudianteClaseSchema(
             id_persona=e.id_persona,
@@ -316,39 +414,98 @@ def crear_asignacion(
     db: Session = Depends(get_db),
     user = Depends(require_permission("/docente-asignatura", "crear"))
 ):
-    docente = db.query(Usuario).filter(
-        Usuario.id_usuario == data.id_usuario_docente,
-        Usuario.es_docente == True,
-        Usuario.fecha_eliminacion.is_(None)
+    # ✅ Validar persona docente (si se proporciona)
+    if data.id_persona_docente is not None:
+        persona = db.query(Persona).filter(
+            Persona.id_persona == data.id_persona_docente,
+            Persona.fecha_eliminacion.is_(None)
+        ).first()
+        if not persona:
+            raise HTTPException(400, "Persona docente no encontrada")
+
+    # ✅ Validar asignatura
+    asignatura = db.query(Asignatura).filter(
+        Asignatura.id_asignatura == data.id_asignatura,
+        Asignatura.fecha_eliminacion.is_(None)
     ).first()
-    if not docente:
-        raise HTTPException(400, "Docente no válido")
-
-    if not db.query(Asignatura).filter(Asignatura.id_asignatura == data.id_asignatura).first():
+    if not asignatura:
         raise HTTPException(400, "Asignatura no encontrada")
-    if not db.query(Grupo).filter(Grupo.id_grupo == data.id_grupo).first():
-        raise HTTPException(400, "Grupo no encontrado")
-    if not db.query(AnioLectivo).filter(
-        AnioLectivo.id_anio_lectivo == data.id_anio_lectivo,
-        AnioLectivo.id_estado == 1
-    ).first():
-        raise HTTPException(400, "Año lectivo no activo")
+    
+    # ✅ Validar grado solo si se especifica
+    if data.id_grado is not None:
+        grado = db.query(Grado).filter(
+            Grado.id_grado == data.id_grado,
+            Grado.fecha_eliminacion.is_(None)
+        ).first()
+        if not grado:
+            raise HTTPException(400, "Grado no encontrado")
+    
+    # ✅ Validar grupo solo si se especifica
+    if data.id_grupo is not None:
+        if data.id_grado is None:
+            raise HTTPException(400, "Para especificar un grupo debe proporcionar el grado")
+        grupo = db.query(Grupo).filter(
+            Grupo.id_grupo == data.id_grupo,
+            Grupo.id_grado == data.id_grado,  # El grupo debe pertenecer al grado
+            Grupo.fecha_eliminacion.is_(None)
+        ).first()
+        if not grupo:
+            raise HTTPException(400, "Grupo no encontrado o no pertenece al grado seleccionado")
+    
+    # ✅ Validar año lectivo solo si se especifica
+    if data.id_anio_lectivo is not None:
+        anio_lectivo = db.query(AnioLectivo).filter(
+            AnioLectivo.id_anio_lectivo == data.id_anio_lectivo,
+            AnioLectivo.id_estado == 1,
+            AnioLectivo.fecha_eliminacion.is_(None)
+        ).first()
+        if not anio_lectivo:
+            raise HTTPException(400, "Año lectivo no encontrado o no está activo")
 
-    if db.query(DocenteAsignatura).filter(
-        DocenteAsignatura.id_usuario_docente == data.id_usuario_docente,
+    # ✅ Verificar si ya existe (evitar duplicados) - manejo de NULL correcto
+    existente_query = db.query(DocenteAsignatura).filter(
         DocenteAsignatura.id_asignatura == data.id_asignatura,
-        DocenteAsignatura.id_grupo == data.id_grupo,
-        DocenteAsignatura.id_anio_lectivo == data.id_anio_lectivo,
         DocenteAsignatura.fecha_eliminacion.is_(None)
-    ).first():
-        raise HTTPException(400, "Asignación ya existe")
+    )
+    
+    if data.id_persona_docente is not None:
+        existente_query = existente_query.filter(DocenteAsignatura.id_persona_docente == data.id_persona_docente)
+    else:
+        existente_query = existente_query.filter(DocenteAsignatura.id_persona_docente.is_(None))
+    
+    if data.id_grado is not None:
+        existente_query = existente_query.filter(DocenteAsignatura.id_grado == data.id_grado)
+    else:
+        existente_query = existente_query.filter(DocenteAsignatura.id_grado.is_(None))
+    
+    if data.id_grupo is not None:
+        existente_query = existente_query.filter(DocenteAsignatura.id_grupo == data.id_grupo)
+    else:
+        existente_query = existente_query.filter(DocenteAsignatura.id_grupo.is_(None))
+    
+    if data.id_anio_lectivo is not None:
+        existente_query = existente_query.filter(DocenteAsignatura.id_anio_lectivo == data.id_anio_lectivo)
+    else:
+        existente_query = existente_query.filter(DocenteAsignatura.id_anio_lectivo.is_(None))
+    
+    existente = existente_query.first()
+    
+    if existente:
+        raise HTTPException(400, "Esta asignación ya existe")
 
-    nueva = DocenteAsignatura(**data.dict())
+    # ✅ Crear nueva asignación con upsert
+    nueva = DocenteAsignatura(
+        id_persona_docente=data.id_persona_docente,
+        id_asignatura=data.id_asignatura,
+        id_grado=data.id_grado,
+        id_grupo=data.id_grupo,  # Puede ser NULL
+        id_anio_lectivo=data.id_anio_lectivo
+    )
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
-
-    return {"mensaje": "Asignación creada", "id": nueva.id_docente_asignatura}
+    
+    return {"mensaje": "Asignación creada exitosamente", "id": nueva.id_docente_asignatura}
 
 
 # 5️⃣ ACTUALIZAR ASIGNACIÓN
@@ -366,27 +523,69 @@ def actualizar_asignacion(
     if not da:
         raise HTTPException(404, "No encontrada")
 
+    # Restricción: solo se puede modificar dentro de 5 días desde la creación
+    try:
+        if da.fecha_creacion and (datetime.now() - da.fecha_creacion).days > 5:
+            raise HTTPException(400, "La asignación no puede modificarse después de 5 días de creada")
+    except Exception:
+        # Si no hay fecha_creacion, permitir (compatibilidad antigua)
+        pass
+
     updates = update.dict(exclude_unset=True)
     if not updates:
         raise HTTPException(400, "Sin datos")
 
     # Validaciones de campos
-    if "id_usuario_docente" in updates:
-        if not db.query(Usuario).filter(
-            Usuario.id_usuario == updates["id_usuario_docente"],
-            Usuario.es_docente == True
-        ).first():
-            raise HTTPException(400, "Docente no válido")
+    if "id_persona_docente" in updates:
+        if updates["id_persona_docente"] is not None:
+            if not db.query(Persona).filter(
+                Persona.id_persona == updates["id_persona_docente"],
+                Persona.fecha_eliminacion.is_(None)
+            ).first():
+                raise HTTPException(400, "Persona docente no válida")
 
     if "id_asignatura" in updates and not db.query(Asignatura).filter(
         Asignatura.id_asignatura == updates["id_asignatura"]
     ).first():
         raise HTTPException(400, "Asignatura no encontrada")
 
-    if "id_grupo" in updates and not db.query(Grupo).filter(
-        Grupo.id_grupo == updates["id_grupo"]
-    ).first():
-        raise HTTPException(400, "Grupo no encontrado")
+    # Validar grado si se cambió
+    grado_actual = da.grado
+    if "id_grado" in updates:
+        grado_actual = db.query(Grado).filter(Grado.id_grado == updates["id_grado"]).first()
+        if not grado_actual:
+            raise HTTPException(400, "Grado no encontrado")
+    
+    # Validar grupo solo si se especifica y cambió
+    if "id_grupo" in updates and updates["id_grupo"] is not None:
+        grupo_valido = db.query(Grupo).filter(
+            Grupo.id_grupo == updates["id_grupo"],
+            Grupo.id_grado == updates.get("id_grado", da.id_grado)
+        ).first()
+        if not grupo_valido:
+            raise HTTPException(400, "Grupo no encontrado o no pertenece al grado")
+    
+    # ✅ VALIDACIÓN: Si se cambió asignatura o grado, verificar grado_asignatura
+    if "id_asignatura" in updates or "id_grado" in updates:
+        asignatura_id = updates.get("id_asignatura", da.id_asignatura)
+        grado_id = updates.get("id_grado", da.id_grado)
+        anio_id = updates.get("id_anio_lectivo", da.id_anio_lectivo)
+        
+        grado_asignatura = db.query(GradoAsignatura).filter(
+            GradoAsignatura.id_grado == grado_id,
+            GradoAsignatura.id_asignatura == asignatura_id,
+            GradoAsignatura.id_anio_lectivo == anio_id,
+            GradoAsignatura.fecha_eliminacion.is_(None)
+        ).first()
+        
+        if not grado_asignatura:
+            grado_nombre = grado_actual.nombre_grado if grado_actual else "desconocido"
+            asignatura_nombre = db.query(Asignatura).filter(Asignatura.id_asignatura == asignatura_id).first()
+            raise HTTPException(
+                400,
+                f"La asignatura '{asignatura_nombre.nombre_asignatura}' no está configurada para el grado '{grado_nombre}'. "
+                f"Primero debe asignarla en 'Grado-Asignatura'."
+            )
 
     if "id_anio_lectivo" in updates and not db.query(AnioLectivo).filter(
         AnioLectivo.id_anio_lectivo == updates["id_anio_lectivo"],
@@ -394,23 +593,47 @@ def actualizar_asignacion(
     ).first():
         raise HTTPException(400, "Año lectivo no activo")
 
-    # Verificar duplicado
-    final = {
-        "id_usuario_docente": updates.get("id_usuario_docente", da.id_usuario_docente),
-        "id_asignatura": updates.get("id_asignatura", da.id_asignatura),
-        "id_grupo": updates.get("id_grupo", da.id_grupo),
-        "id_anio_lectivo": updates.get("id_anio_lectivo", da.id_anio_lectivo),
-    }
-
-    if db.query(DocenteAsignatura).filter(
+    # Verificar duplicado con manejo correcto de NULL
+    final_dict = {}
+    
+    # Construir diccionario con valores actuales o actualizados
+    persona_value = updates.get("id_persona_docente", da.id_persona_docente)
+    asignatura_value = updates.get("id_asignatura", da.id_asignatura)
+    grado_value = updates.get("id_grado", da.id_grado)
+    grupo_value = updates.get("id_grupo", da.id_grupo)
+    anio_value = updates.get("id_anio_lectivo", da.id_anio_lectivo)
+    
+    # Construir query con manejo correcto de NULL
+    duplicado_query = db.query(DocenteAsignatura).filter(
         DocenteAsignatura.id_docente_asignatura != id_docente_asignatura,
-        DocenteAsignatura.id_usuario_docente == final["id_usuario_docente"],
-        DocenteAsignatura.id_asignatura == final["id_asignatura"],
-        DocenteAsignatura.id_grupo == final["id_grupo"],
-        DocenteAsignatura.id_anio_lectivo == final["id_anio_lectivo"],
+        DocenteAsignatura.id_asignatura == asignatura_value,
         DocenteAsignatura.fecha_eliminacion.is_(None)
-    ).first():
-        raise HTTPException(400, "Ya existe esta combinación")
+    )
+    
+    if persona_value is not None:
+        duplicado_query = duplicado_query.filter(DocenteAsignatura.id_persona_docente == persona_value)
+    else:
+        duplicado_query = duplicado_query.filter(DocenteAsignatura.id_persona_docente.is_(None))
+    
+    if grado_value is not None:
+        duplicado_query = duplicado_query.filter(DocenteAsignatura.id_grado == grado_value)
+    else:
+        duplicado_query = duplicado_query.filter(DocenteAsignatura.id_grado.is_(None))
+    
+    if grupo_value is not None:
+        duplicado_query = duplicado_query.filter(DocenteAsignatura.id_grupo == grupo_value)
+    else:
+        duplicado_query = duplicado_query.filter(DocenteAsignatura.id_grupo.is_(None))
+    
+    if anio_value is not None:
+        duplicado_query = duplicado_query.filter(DocenteAsignatura.id_anio_lectivo == anio_value)
+    else:
+        duplicado_query = duplicado_query.filter(DocenteAsignatura.id_anio_lectivo.is_(None))
+    
+    duplicado = duplicado_query.first()
+    
+    if duplicado:
+        raise HTTPException(400, "Ya existe esta asignación")
 
     for k, v in updates.items():
         setattr(da, k, v)
@@ -434,12 +657,26 @@ def eliminar_asignacion(
     if not da:
         raise HTTPException(404, "No encontrada")
 
-    count = db.query(Calificacion).filter(
-        Calificacion.id_usuario == da.id_usuario_docente,
-        Calificacion.id_asignatura == da.id_asignatura,
-        Calificacion.id_anio_lectivo == da.id_anio_lectivo,
-        Calificacion.fecha_eliminacion.is_(None)
-    ).count()
+    # Restricción: solo se puede eliminar dentro de 5 días desde la creación
+    try:
+        if da.fecha_creacion and (datetime.now() - da.fecha_creacion).days > 5:
+            raise HTTPException(400, "La asignación no puede eliminarse después de 5 días de creada")
+    except Exception:
+        pass
+
+    # Obtener id_usuario del docente si existe (para filtrar calificaciones)
+    count = 0
+    if da.id_persona_docente:
+        usuario_docente = db.query(Usuario).filter(
+            Usuario.id_persona == da.id_persona_docente
+        ).first()
+        if usuario_docente:
+            count = db.query(Calificacion).filter(
+                Calificacion.id_usuario == usuario_docente.id_usuario,
+                Calificacion.id_asignatura == da.id_asignatura,
+                Calificacion.id_anio_lectivo == da.id_anio_lectivo,
+                Calificacion.fecha_eliminacion.is_(None)
+            ).count()
 
     if count > 0:
         raise HTTPException(400, f"No se puede eliminar: existen {count} calificaciones asociadas.")
@@ -448,3 +685,111 @@ def eliminar_asignacion(
     db.commit()
 
     return {"mensaje": "Eliminada"}
+
+
+# 7️⃣ LISTAR DOCENTES DISPONIBLES POR GRADO/ASIGNATURA/AÑO (DISTINCT)
+@router.get("/docentes-disponibles", response_model=List[dict])
+def docentes_disponibles(
+    grado_id: Optional[int] = None,
+    asignatura_id: int = Query(...),
+    anio_lectivo_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user = Depends(require_permission("/docente-asignatura", "ver"))
+):
+    # Listar exclusivamente docentes que realmente tienen filas en docente_asignatura
+    # para la asignatura indicada, usando persona (no usuario)
+    PersonaDocente = aliased(Persona)
+    
+    # Construir el query base
+    q = (
+        db.query(
+            DocenteAsignatura.id_persona_docente,
+            func.concat(PersonaDocente.nombre, ' ', PersonaDocente.apellido).label("docente_nombre"),
+            PersonaDocente.numero_identificacion.label("docente_identificacion"),
+        )
+        .join(PersonaDocente, DocenteAsignatura.id_persona_docente == PersonaDocente.id_persona)
+        .filter(
+            DocenteAsignatura.id_asignatura == asignatura_id,
+            DocenteAsignatura.fecha_eliminacion.is_(None),
+            PersonaDocente.fecha_eliminacion.is_(None),
+            DocenteAsignatura.id_persona_docente.isnot(None)  # Asegurar que tenga docente asignado
+        )
+    )
+    
+    # Aplicar filtros opcionales solo si se proporcionan
+    if grado_id is not None:
+        q = q.filter(DocenteAsignatura.id_grado == grado_id)
+    if anio_lectivo_id is not None:
+        q = q.filter(DocenteAsignatura.id_anio_lectivo == anio_lectivo_id)
+    
+    try:
+        # Usar distinct() para asegurar que no haya duplicados
+        # Primero ordenar y luego aplicar distinct
+        res = q.order_by(DocenteAsignatura.id_persona_docente, PersonaDocente.nombre, PersonaDocente.apellido).distinct(DocenteAsignatura.id_persona_docente).all()
+    except Exception as e:
+        print(f"⚠️ docentes_disponibles error: {e}")
+        import traceback
+        traceback.print_exc()
+        # Fallback: usar distinct() sin argumento si el método anterior falla
+        try:
+            res = q.distinct().order_by(PersonaDocente.nombre, PersonaDocente.apellido).all()
+        except:
+            res = []
+    
+    # Convertir resultados y eliminar duplicados adicionales por si acaso
+    seen = set()
+    result_list = []
+    for r in res:
+        if r.id_persona_docente and r.id_persona_docente not in seen:
+            seen.add(r.id_persona_docente)
+            result_list.append({
+                "id_persona_docente": r.id_persona_docente,
+                "docente_nombre": r.docente_nombre,
+                "docente_identificacion": r.docente_identificacion,
+            })
+    
+    return result_list
+
+
+# 8️⃣ LISTAR DOCENTES CANDIDATOS (TODOS LOS DOCENTES)
+@router.get("/docentes-candidatos", response_model=List[dict])
+def docentes_candidatos(
+    buscar: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user = Depends(require_permission("/docente-asignatura", "ver"))
+):
+    PersonaDocente = aliased(Persona)
+    q = (
+        db.query(
+            PersonaDocente.id_persona.label("id_persona_docente"),
+            func.concat(PersonaDocente.nombre, ' ', PersonaDocente.apellido).label("docente_nombre"),
+            PersonaDocente.numero_identificacion.label("docente_identificacion"),
+        )
+        .join(Usuario, Usuario.id_persona == PersonaDocente.id_persona)
+        .filter(
+            Usuario.es_docente == True,
+            Usuario.fecha_eliminacion.is_(None),
+            PersonaDocente.fecha_eliminacion.is_(None)
+        )
+    )
+    if buscar:
+        like = f"%{buscar.strip()}%"
+        from sqlalchemy import or_
+        q = q.filter(or_(
+            PersonaDocente.nombre.ilike(like),
+            PersonaDocente.apellido.ilike(like),
+            PersonaDocente.numero_identificacion.ilike(like)
+        ))
+    try:
+        res = q.order_by(PersonaDocente.nombre, PersonaDocente.apellido).all()
+    except Exception as e:
+        print(f"⚠️ docentes_candidatos error: {e}")
+        res = []
+    return [
+        {
+            "id_persona_docente": r.id_persona_docente,
+            "docente_nombre": r.docente_nombre,
+            "docente_identificacion": r.docente_identificacion,
+        }
+        for r in res
+    ]

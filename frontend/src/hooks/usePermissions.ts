@@ -58,6 +58,30 @@ export const usePermissions = () => {
     };
   }, [userPermissions, availableOptions]);
 
+  // Verificar si el usuario es desarrollador (puede hacer todo)
+  const isDeveloper = (): boolean => {
+    return state.user.roles?.includes('desarrollador') || hasPermission('all_access');
+  };
+
+  // Verificar si puede editar notas
+  const canEditNotas = (anioLectivoEstado?: string): boolean => {
+    // Desarrollador puede editar siempre
+    if (isDeveloper()) return true;
+    
+    // Si el año lectivo ha finalizado, no se puede editar
+    if (anioLectivoEstado === 'finalizado' || anioLectivoEstado === 'cerrado') {
+      return false;
+    }
+    
+    // Verificar permisos de edición
+    return hasAnyPermission(['editar_notas', 'gestionar_notas', 'docente']);
+  };
+
+  // Verificar si puede eliminar registros
+  const canDelete = (): boolean => {
+    return isDeveloper() || hasPermission('eliminar_registros');
+  };
+
   return {
     // Verificación de permisos
     hasPermission,
@@ -73,8 +97,14 @@ export const usePermissions = () => {
     // Estadísticas
     permissionStats,
 
+    // Permisos especiales
+    isDeveloper,
+    canEditNotas,
+    canDelete,
+
     // Datos del usuario
     userPermissions,
+    userRoles: state.user.roles || [],
     isAuthenticated: state.user.isAuthenticated
   };
 };

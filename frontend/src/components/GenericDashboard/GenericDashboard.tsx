@@ -17,6 +17,13 @@ import PersonasCRUD from '../../pages/personal/PersonasCRUD';
 import DocentesCRUD from '../../pages/personal/DocentesCRUD';
 import EstudiantesCRUD from '../../pages/personal/EstudiantesCRUD';
 import AcudientesCRUD from '../../pages/personal/AcudientesCRUD';
+import AdminAcademica from '../../pages/AdminAcademica';
+import { DocenteAsignaturaCRUD, GruposCRUD, GenerarBoletines, GradoAsignaturaCRUD, GradoAsignaturaManager, DocenteAsignaturaUnificado } from '../../pages/adminacademica/index';
+import AsignaturasUnificado from '../../pages/adminacademica/AsignaturasUnificado';
+import GradoAsignaturaManager_Simple from '../../pages/adminacademica/GradoAsignaturaManager_Simple';
+import GestorAcademicoCompleto from '../../pages/adminacademica/GestorAcademicoCompleto';
+import Reportes from '../../pages/reportes/Reportes';
+import UsuarioRolCRUD from '../../pages/Admin/UsuarioRolCRUD';
 import './GenericDashboard.css';
 
 interface MenuItem {
@@ -54,11 +61,23 @@ const GenericDashboard: React.FC<DashboardProps> = ({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   
-  // Detectar la ruta actual para mostrar el contenido correcto
+  // Detectar la ruta actual y parámetros de query para mostrar el contenido correcto
   useEffect(() => {
     const path = location.pathname;
-    console.log('📍 Current path:', path);
+    const searchParams = new URLSearchParams(location.search);
+    const sectionParam = searchParams.get('section');
     
+    console.log('📍 Current path:', path);
+    console.log('🔍 Section parameter:', sectionParam);
+    
+    // Prioridad 1: Si hay un parámetro ?section= en la URL, usarlo
+    if (sectionParam) {
+      console.log('✅ Usando section de query parameter:', sectionParam);
+      setActiveSection(sectionParam);
+      return;
+    }
+    
+    // Prioridad 2: Detectar por pathname
     if (path === '/basic/periodos') setActiveSection('periodos');
     else if (path === '/basic/asignaturas') setActiveSection('asignaturas');
     else if (path === '/basic/grados') setActiveSection('grados');
@@ -67,8 +86,8 @@ const GenericDashboard: React.FC<DashboardProps> = ({
     else if (path === '/basic/estados-anio') setActiveSection('estados-anio');
     else if (path === '/basic/tipos-identificacion') setActiveSection('tipos-identificacion');
     else if (path === '/basic/ubicacion') setActiveSection('ubicacion');
-    else if (path === '/basic') setActiveSection('basicos');
-    else if (path.startsWith('/personal/')) {
+    else if (path === '/basic' || path === '/basic/') setActiveSection('basicos');
+    else if (path === '/personal' || path.startsWith('/personal/')) {
       if (path === '/personal/personas') setActiveSection('personas-crud');
       else if (path === '/personal/docentes') setActiveSection('docentes-crud');
       else if (path === '/personal/estudiantes') setActiveSection('estudiantes-crud');
@@ -77,7 +96,7 @@ const GenericDashboard: React.FC<DashboardProps> = ({
     }
     else if (path === '/admin/dashboard' || path === '/dashboard') setActiveSection('dashboard');
     // Mantener activeSection si ya está configurado
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   // Verificar autenticación con delay para permitir restauración
   React.useEffect(() => {
@@ -228,11 +247,23 @@ const GenericDashboard: React.FC<DashboardProps> = ({
                     </div>
                   </div>
                   <div className="profile-actions">
-                    <button className="profile-action">
+                    <button
+                      className="profile-action"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        navigate('/mi-perfil');
+                      }}
+                    >
                       <span className="material-icons">settings</span>
                       Configuración
                     </button>
-                    <button className="profile-action">
+                    <button
+                      className="profile-action"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        navigate('/mi-perfil');
+                      }}
+                    >
                       <span className="material-icons">person</span>
                       Mi Perfil
                     </button>
@@ -279,20 +310,20 @@ const GenericDashboard: React.FC<DashboardProps> = ({
                   <span>Personal Académico</span>
                 </button>
                 <button
-                  key="cargos"
-                  className={`academic-nav-item ${activeSection === 'cargos' ? 'active' : ''}`}
-                  onClick={() => setActiveSection('cargos')}
-                >
-                  <span className="material-icons">assignment_ind</span>
-                  <span>Cargos y Matrículas</span>
-                </button>
-                <button
                   key="admin-academica"
                   className={`academic-nav-item ${activeSection === 'admin-academica' ? 'active' : ''}`}
                   onClick={() => setActiveSection('admin-academica')}
                 >
                   <span className="material-icons">school</span>
                   <span>Administración Académica</span>
+                </button>
+                <button
+                  key="reporte-notas"
+                  className={`academic-nav-item ${activeSection === 'reporte-notas' ? 'active' : ''}`}
+                  onClick={() => setActiveSection('reporte-notas')}
+                >
+                  <span className="material-icons">assessment</span>
+                  <span>Reporte de Notas</span>
                 </button>
                 <button
                   key="help"
@@ -310,7 +341,6 @@ const GenericDashboard: React.FC<DashboardProps> = ({
               {activeSection === 'dashboard' ? 'Panel Principal' : 
                activeSection === 'basicos' ? 'Básico' :
                activeSection === 'people' ? 'Personal Académico' :
-               activeSection === 'cargos' ? 'Cargos y Matrículas' :
                activeSection === 'admin-academica' ? 'Administración Académica' :
                sidebarMenuItems.find(item => item.id === activeSection)?.label ||
                topMenuItems.find(item => item.id === activeSection)?.label ||
@@ -363,9 +393,46 @@ const GenericDashboard: React.FC<DashboardProps> = ({
               <Basicos />
             )}
 
+            {activeSection === 'admin-academica' && (
+              <GestorAcademicoCompleto />
+            )}
+
+      {activeSection === 'grupos' && (
+        <div>
+          <h3>🔧 Debug: Cargando GruposCRUD</h3>
+          <GruposCRUD />
+        </div>
+      )}
+
+      {activeSection === 'grado-asignatura' && (
+        <div>
+          <h3>🔧 Debug: Cargando GradoAsignaturaManager_Simple (Versión Robusta)</h3>
+          <GradoAsignaturaManager_Simple />
+        </div>
+      )}
+
+      {activeSection === 'docente-asignatura' && (
+        <div>
+          <h3>🔧 Debug: Cargando DocenteAsignaturaCRUD</h3>
+          <DocenteAsignaturaCRUD />
+        </div>
+      )}
+
+            {activeSection === 'generar-boletines' && (
+              <GenerarBoletines />
+            )}
+
+            {activeSection === 'reportes' && (
+              <Reportes />
+            )}
+
+            {activeSection === 'usuario-rol' && (
+              <UsuarioRolCRUD />
+            )}
+
             {/* Renderizar CRUDs de basicacademico */}
             {activeSection === 'periodos' && <PeriodosCRUD />}
-            {activeSection === 'asignaturas' && <AsignaturasCRUD />}
+            {activeSection === 'asignaturas' && <AsignaturasUnificado />}
             {activeSection === 'grados' && <GradosCRUD />}
             {activeSection === 'jornadas' && <JornadasCRUD />}
             {activeSection === 'aniolectivo' && <AnioLectivoCRUD />}
@@ -379,9 +446,16 @@ const GenericDashboard: React.FC<DashboardProps> = ({
             {activeSection === 'estudiantes-crud' && <EstudiantesCRUD />}
             {activeSection === 'acudientes-crud' && <AcudientesCRUD />}
 
-            {activeSection !== 'dashboard' && 
-             activeSection !== 'people' && 
-             activeSection !== 'basicos' &&
+       {activeSection !== 'dashboard' && 
+        activeSection !== 'people' && 
+        activeSection !== 'basicos' &&
+        activeSection !== 'admin-academica' &&
+        activeSection !== 'grupos' &&
+        activeSection !== 'grado-asignatura' &&
+        activeSection !== 'docente-asignatura' &&
+        activeSection !== 'generar-boletines' &&
+        activeSection !== 'reportes' &&
+        activeSection !== 'usuario-rol' &&
              activeSection !== 'periodos' &&
              activeSection !== 'asignaturas' &&
              activeSection !== 'grados' &&

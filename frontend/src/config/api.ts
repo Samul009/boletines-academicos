@@ -1,7 +1,27 @@
 // Configuración centralizada de la API
+const getApiBaseUrl = () => {
+  // Prioridad: Variable de entorno > Detección automática
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // En desarrollo, probar múltiples URLs comunes
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8000';
+  }
+  
+  // En producción, usar la misma base que el frontend
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  const port = window.location.port;
+  
+  const apiPort = port ? (parseInt(port) === 3000 ? '8000' : port) : '8000';
+  return `${protocol}//${hostname}:${apiPort}`;
+};
+
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
-  TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT) || 10000,
+  BASE_URL: getApiBaseUrl(),
+  TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT) || 30000, // Aumentado a 30s para debug
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
 } as const;
@@ -16,6 +36,7 @@ export const HTTP_STATUS = {
   NOT_FOUND: 404,
   UNPROCESSABLE_ENTITY: 422,
   INTERNAL_SERVER_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503,
 } as const;
 
 export const API_ENDPOINTS = {

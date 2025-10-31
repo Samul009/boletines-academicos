@@ -211,8 +211,9 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 20px;
+  padding: 15px 20px;
   border-top: 1px solid #eee;
+  margin-top: 20px;
 }
 
 .loading-spinner {
@@ -259,6 +260,16 @@
   opacity: 0.9;
 }
 
+.badge-success {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.badge-danger {
+  background: #ffebee;
+  color: #d32f2f;
+}
+
 .btn-secondary {
   background: #6c757d;
   color: white;
@@ -275,12 +286,37 @@
 /* Estilos para modal de perfil/historial */
 .docente-profile-modal {
   max-width: 900px;
-  max-height: 90vh;
-  overflow-y: auto;
+  max-height: 85vh; /* Reducido para mejor visualización */
+  overflow: hidden; /* El overflow lo maneja el .profile-body */
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15); /* Sombra más prominente */
 }
 
-.profile-body {
-  padding: 0;
+.docente-profile-modal .modal-header {
+  flex-shrink: 0; /* El header no se comprime */
+}
+
+.docente-profile-modal .profile-body {
+  flex: 1;
+  overflow-y: auto; /* Solo el body tiene scroll */
+  overflow-x: hidden;
+  padding: 20px;
+  padding-bottom: 30px; /* Reducido ya que no hay footer */
+  position: relative;
+}
+
+/* Indicador visual de scroll disponible */
+.docente-profile-modal .profile-body::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px; /* Reducido ya que no hay footer */
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.9), transparent);
+  pointer-events: none;
+  z-index: 5;
 }
 
 .profile-section {
@@ -291,6 +327,31 @@
 
 .profile-section:last-of-type {
   border-bottom: none;
+  margin-bottom: 20px; /* Espacio al final del modal */
+}
+
+/* Scroll suave para el modal */
+.docente-profile-modal .profile-body {
+  scroll-behavior: smooth;
+}
+
+/* Estilo personalizado de scrollbar */
+.docente-profile-modal .profile-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.docente-profile-modal .profile-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.docente-profile-modal .profile-body::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+
+.docente-profile-modal .profile-body::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 
 .section-title {
@@ -382,4 +443,150 @@
 .info-message p {
   margin: 0;
   font-size: 0.95rem;
+}
+
+/* ============================================
+   RESPONSIVE STYLES
+   ============================================ */
+
+/* Tablets y pantallas medianas */
+@media (max-width: 1024px) {
+  .docente-profile-modal {
+    max-width: 95%;
+  }
+}
+
+/* Móviles */
+@media (max-width: 768px) {
+  .docente-profile-modal {
+    max-width: 98%;
+    max-height: 92vh; /* Más altura en móvil */
+    margin: 10px;
+  }
+
+  .docente-profile-modal .modal-header {
+    padding: 16px;
+  }
+
+  .docente-profile-modal .profile-body {
+    padding: 16px;
+    padding-bottom: 20px; /* Ajustado sin footer */
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr; /* Una columna en móvil */
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+  }
+
+  .profile-section {
+    margin-bottom: 20px;
+  }
+
+  .profile-section:last-of-type {
+    margin-bottom: 15px;
+  }
+
+  /* Hacer tablas scrolleables horizontalmente en móvil */
+  .docente-profile-modal table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Móviles pequeños */
+@media (max-width: 480px) {
+  .docente-profile-modal {
+    max-height: 95vh;
+  }
+
+  .docente-profile-modal .profile-body {
+    padding: 12px;
+    padding-bottom: 20px;
+  }
+
+  .section-title {
+    font-size: 1rem;
+  }
+
+  .detail-group p {
+    font-size: 0.9rem;
+  }
+
+  .notas-table th,
+  .notas-table td {
+    font-size: 0.85rem;
+    padding: 8px;
+  }
+}
+
+/* ============================================
+   TABLA DE NOTAS PROFESIONAL
+   ============================================ */
+
+.notas-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.notas-table thead {
+  background: linear-gradient(135deg, var(--primary-color) 0%, #1b5e20 100%);
+  color: white;
+}
+
+.notas-table th {
+  padding: 14px 12px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.notas-table th:first-child {
+  text-align: left;
+}
+
+.notas-table td {
+  padding: 12px;
+  text-align: center;
+  border: 1px solid #e0e0e0;
+  vertical-align: middle;
+}
+
+.notas-table td:first-child {
+  text-align: left;
+  background: #fafafa;
+}
+
+.notas-table tbody tr {
+  transition: all 0.2s;
+}
+
+.notas-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.notas-table tbody tr:hover td:first-child {
+  background: #f0f0f0;
+}
+
+/* Input de edición de nota */
+.notas-table input[type="number"] {
+  font-family: inherit;
+}
+
+.notas-table input[type="number"]::-webkit-inner-spin-button,
+.notas-table input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+  height: 30px;
 }

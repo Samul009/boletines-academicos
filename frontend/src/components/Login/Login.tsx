@@ -20,19 +20,17 @@ const Login: React.FC<LoginProps> = ({
   icon,
   roleType,
   redirectPath,
-  requiredPermissions = [],
   backgroundColor = 'var(--primary-color)'
 }) => {
   const navigate = useNavigate();
   const { actions } = useAppContext();
-  const { post, makeRequest, loading, error } = useApi();
+  const { makeRequest, loading, error } = useApi();
   
   const [formData, setFormData] = useState({
     username: '',
     password: ''
   });
   const [loginError, setLoginError] = useState<string>('');
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -104,25 +102,25 @@ const Login: React.FC<LoginProps> = ({
       })) || [];
 
       // Identificar roles del usuario
-      const userRoles = [];
-      const pageRoutes = detailedPermissions.map(p => p.pagina.ruta?.toLowerCase() || '');
-      const pageNames = detailedPermissions.map(p => p.pagina.nombre?.toLowerCase() || '');
+      const userRoles: string[] = [];
+      const pageRoutes = detailedPermissions.map((p: any) => p.pagina.ruta?.toLowerCase() || '');
+      const pageNames = detailedPermissions.map((p: any) => p.pagina.nombre?.toLowerCase() || '');
       
       // Detectar rol de desarrollador
-      if (pageRoutes.some(route => route.includes('developer') || route.includes('/dev')) ||
-          pageNames.some(name => name.includes('desarrollador') || name.includes('developer'))) {
+      if (pageRoutes.some((route: string) => route.includes('developer') || route.includes('/dev')) ||
+          pageNames.some((name: string) => name.includes('desarrollador') || name.includes('developer'))) {
         userRoles.push('developer');
       }
       
       // Detectar rol de administrador
-      if (pageRoutes.some(route => route.includes('admin') || route.includes('usuario') || route.includes('permiso')) ||
-          pageNames.some(name => name.includes('administr') || name.includes('usuario') || name.includes('permiso'))) {
+      if (pageRoutes.some((route: string) => route.includes('admin') || route.includes('usuario') || route.includes('permiso')) ||
+          pageNames.some((name: string) => name.includes('administr') || name.includes('usuario') || name.includes('permiso'))) {
         userRoles.push('admin');
       }
       
       // Detectar rol de docente
-      if (pageRoutes.some(route => route.includes('nota') || route.includes('calificacion') || route.includes('boletin')) ||
-          pageNames.some(name => name.includes('nota') || name.includes('calificacion') || name.includes('docente'))) {
+      if (pageRoutes.some((route: string) => route.includes('nota') || route.includes('calificacion') || route.includes('boletin')) ||
+          pageNames.some((name: string) => name.includes('nota') || name.includes('calificacion') || name.includes('docente'))) {
         userRoles.push('docente');
       }
 
@@ -158,7 +156,20 @@ const Login: React.FC<LoginProps> = ({
 
     } catch (err: any) {
       console.error('Login error:', err);
-      setLoginError(err.message || 'Error de autenticación');
+      
+      // Extraer el mensaje de error del formato de axios/FastAPI
+      let errorMessage = 'Error de autenticación';
+      
+      if (err.response?.data) {
+        // FastAPI devuelve 'detail'
+        errorMessage = err.response.data.detail || err.response.data.message || errorMessage;
+      } else if (err.message) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
+      setLoginError(errorMessage);
       localStorage.removeItem('access_token');
       localStorage.removeItem('token_type');
     } finally {
@@ -167,7 +178,6 @@ const Login: React.FC<LoginProps> = ({
   };
 
   const handleForgotPassword = () => {
-    setShowForgotPassword(true);
     // Aquí se implementaría la lógica de recuperación
     alert('Funcionalidad de recuperación de contraseña próximamente');
   };

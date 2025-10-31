@@ -137,19 +137,42 @@ def exportar_plantilla_excel(
     if not periodo or periodo.id_anio_lectivo != da.id_anio_lectivo:
         raise HTTPException(400, "Período inválido")
 
-    estudiantes = db.execute(text("""
-        SELECT p.apellido, p.nombre, p.numero_identificacion, c.calificacion_numerica
-        FROM persona p
-        JOIN matricula m ON m.id_persona = p.id_persona
-        LEFT JOIN calificacion c ON c.id_persona = p.id_persona 
-            AND c.id_asignatura = :asig AND c.id_periodo = :periodo 
-            AND c.id_anio_lectivo = :anio
-        WHERE m.id_grupo = :grupo AND m.id_anio_lectivo = :anio AND m.activo = TRUE
-        ORDER BY p.apellido
-    """), {
-        "asig": da.id_asignatura, "periodo": id_periodo,
-        "anio": da.id_anio_lectivo, "grupo": da.id_grupo
-    }).fetchall()
+    # Construir query según si id_grupo es NULL o tiene valor
+    if da.id_grupo is None:
+        # Obtener todos los grupos del grado
+        grupos_query = db.execute(text("""
+            SELECT id_grupo FROM grupo 
+            WHERE id_grado = :grado AND id_anio_lectivo = :anio AND fecha_eliminacion IS NULL
+        """), {"grado": da.id_grado, "anio": da.id_anio_lectivo}).fetchall()
+        grupos_ids = [g[0] for g in grupos_query]
+        
+        estudiantes = db.execute(text("""
+            SELECT p.apellido, p.nombre, p.numero_identificacion, c.calificacion_numerica
+            FROM persona p
+            JOIN matricula m ON m.id_persona = p.id_persona
+            LEFT JOIN calificacion c ON c.id_persona = p.id_persona 
+                AND c.id_asignatura = :asig AND c.id_periodo = :periodo 
+                AND c.id_anio_lectivo = :anio
+            WHERE m.id_grupo IN :grupos AND m.id_anio_lectivo = :anio AND m.activo = TRUE
+            ORDER BY p.apellido
+        """), {
+            "asig": da.id_asignatura, "periodo": id_periodo,
+            "anio": da.id_anio_lectivo, "grupos": tuple(grupos_ids)
+        }).fetchall()
+    else:
+        estudiantes = db.execute(text("""
+            SELECT p.apellido, p.nombre, p.numero_identificacion, c.calificacion_numerica
+            FROM persona p
+            JOIN matricula m ON m.id_persona = p.id_persona
+            LEFT JOIN calificacion c ON c.id_persona = p.id_persona 
+                AND c.id_asignatura = :asig AND c.id_periodo = :periodo 
+                AND c.id_anio_lectivo = :anio
+            WHERE m.id_grupo = :grupo AND m.id_anio_lectivo = :anio AND m.activo = TRUE
+            ORDER BY p.apellido
+        """), {
+            "asig": da.id_asignatura, "periodo": id_periodo,
+            "anio": da.id_anio_lectivo, "grupo": da.id_grupo
+        }).fetchall()
 
     data = []
     for i, est in enumerate(estudiantes):

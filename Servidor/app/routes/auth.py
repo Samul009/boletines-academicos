@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 from datetime import datetime, timedelta, UTC
 from pydantic import BaseModel, EmailStr
 import random
@@ -135,11 +136,32 @@ def cambiar_contrasena_olvidada(data: CambiarContrasenaOlvidada, db: Session = D
 # === 4. INICIO DE SESIÓN ===
 @router.post("/iniciar-sesion", response_model=Token)
 def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # Consultar directamente desde el modelo Usuario
-    user = db.query(Usuario).filter(
-        Usuario.username == form.username,
-        Usuario.fecha_eliminacion.is_(None)
-    ).first()
+    print(f"🔐 Intento de login para usuario: {form.username}")
+    try:
+        # Consultar directamente desde el modelo Usuario
+        print(f"🔍 Consultando usuario en base de datos...")
+        user = db.query(Usuario).filter(
+            Usuario.username == form.username,
+            Usuario.fecha_eliminacion.is_(None)
+        ).first()
+        print(f"✅ Consulta completada. Usuario encontrado: {user is not None}")
+    except OperationalError as e:
+        # Error de conexión a la base de datos
+        error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+        if "Can't connect to MySQL server" in error_msg or "connection refused" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="El servidor de base de datos no está disponible. Por favor, verifica que MySQL esté corriendo."
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error de conexión a la base de datos: {error_msg}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno del servidor: {str(e)}"
+        )
 
     if not user or not verify_password(form.password, user.password):
         raise HTTPException(

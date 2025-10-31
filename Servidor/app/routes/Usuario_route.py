@@ -13,18 +13,31 @@ router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 
 # ==================== FUNCIÓN AUXILIAR ====================
 def _cargar_permisos_usuario(db: Session, user_db: UsuarioDB):
-    roles = db.query(usuario_rol.c.id_rol).filter(
+    from ..models.models import Rol, Grupo
+    from ..models.Usuario_model import Usuario as UsuarioSchema
+    
+    # Obtener IDs de roles del usuario
+    roles_query = db.query(usuario_rol.c.id_rol).filter(
         usuario_rol.c.id_usuario == user_db.id_usuario
     ).all()
-    rol_ids = [r.id_rol for r in roles]
+    rol_ids = [r.id_rol for r in roles_query]
 
+    # Obtener nombres de roles como strings
+    role_names = db.query(Rol.nombre_rol).filter(Rol.id_rol.in_(rol_ids)).all()
+    role_names_list = [r[0] for r in role_names] if role_names else []
+
+    # Obtener permisos
     permisos_db = db.query(Permiso).join(Pagina).filter(
         Permiso.id_rol.in_(rol_ids)
-    ).all()
+    ).all() if rol_ids else []
 
     permisos_listos = [
         {
-            "pagina": p_db.pagina,
+            "pagina": {
+                "id_pagina": p_db.pagina.id_pagina,
+                "nombre": p_db.pagina.nombre,
+                "ruta": p_db.pagina.ruta
+            },
             "puede_ver": p_db.puede_ver,
             "puede_crear": p_db.puede_crear,
             "puede_editar": p_db.puede_editar,
@@ -33,8 +46,40 @@ def _cargar_permisos_usuario(db: Session, user_db: UsuarioDB):
         for p_db in permisos_db
     ]
     
-    user_db.permisos = permisos_listos 
-    return user_db
+    # Obtener persona si existe
+    persona_simple = None
+    if user_db.persona:
+        persona_simple = {
+            "id_persona": user_db.persona.id_persona,
+            "nombre": user_db.persona.nombre,
+            "apellido": user_db.persona.apellido,
+            "email": user_db.persona.email,
+            "telefono": user_db.persona.telefono,
+        }
+    
+    # Verificar si es director de grupo
+    es_director_grupo = db.query(Grupo).filter(
+        Grupo.id_usuario_director == user_db.id_usuario,
+        Grupo.fecha_eliminacion.is_(None)
+    ).first() is not None
+    
+    # Construir diccionario con todos los datos (evitar modificar objeto ORM)
+    usuario_dict = {
+        "id_usuario": user_db.id_usuario,
+        "username": user_db.username,
+        "password": user_db.password,  # Necesario para el schema
+        "es_docente": user_db.es_docente,
+        "es_director_grupo": es_director_grupo,
+        "id_persona": user_db.id_persona,
+        "roles": role_names_list,  # Lista de strings
+        "permisos": permisos_listos,
+        "persona": persona_simple,
+        "fecha_creacion": user_db.fecha_creacion,
+        "fecha_actualizacion": user_db.fecha_actualizacion,
+        "fecha_eliminacion": user_db.fecha_eliminacion,
+    }
+    
+    return UsuarioSchema(**usuario_dict)
 
 # ==================== LISTAR ====================
 @router.get("/", response_model=List[Usuario])
@@ -54,7 +99,9 @@ def listar_usuarios(
     # if es_director_grupo is not None:
     #     query = query.filter(UsuarioDB.es_director_grupo == es_director_grupo)
 
-    return query.all()
+    usuarios = query.all()
+    # Procesar cada usuario para cargar roles y permisos
+    return [_cargar_permisos_usuario(db, u) for u in usuarios]
 
 # ==================== OBTENER POR ID ====================
 @router.get("/{id_usuario}", response_model=Usuario)

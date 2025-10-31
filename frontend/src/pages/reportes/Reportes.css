@@ -1,0 +1,9 @@
+/* Estilos para la página de Reportes */
+
+.reporte-notas-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  min-height: 400px;
+}
+

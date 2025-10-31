@@ -21,6 +21,7 @@ def listar_personas(
     tipo_id: Optional[int] = Query(None),
     ciudad_id: Optional[int] = Query(None),
     genero: Optional[str] = Query(None),
+    buscar: Optional[str] = Query(None, description="Buscar por nombre, apellido o número de identificación"),
     user = Depends(require_permission("/personas", "ver")),
     db: Session = Depends(get_db)
 ):
@@ -32,8 +33,20 @@ def listar_personas(
         query = query.filter(PersonaDB.id_ciudad_nacimiento == ciudad_id)
     if genero:
         query = query.filter(PersonaDB.genero == genero.upper())
+    if buscar:
+        # Sanitizar búsqueda y optimizar query
+        buscar_like = f"%{buscar.strip()}%"
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                PersonaDB.nombre.ilike(buscar_like),
+                PersonaDB.apellido.ilike(buscar_like),
+                PersonaDB.numero_identificacion.ilike(buscar_like)
+            )
+        )
 
-    return query.all()
+    # Ordenar resultados para mejor experiencia
+    return query.order_by(PersonaDB.nombre, PersonaDB.apellido).all()
 
 
 @router.get("/{id_persona}", response_model=Persona)

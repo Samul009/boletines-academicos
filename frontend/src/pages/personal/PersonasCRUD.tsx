@@ -31,7 +31,7 @@ const PersonasCRUD: React.FC = () => {
         },
         { 
           name: 'id_ciudad_nacimiento', 
-          label: 'Ciudad de Nacimiento', 
+          label: 'Ciudad/Municipio', 
           type: 'select', 
           required: false,
           relationEndpoint: '/ubicacion/ciudades',
@@ -46,4 +46,3 @@ const PersonasCRUD: React.FC = () => {
 };
 
 export default PersonasCRUD;
-

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context';
 import { useNavigate } from 'react-router-dom';
 import { useRolePermissions } from '../../hooks/useRolePermissions';
+import NotasPanel from './NotasPanel';
 import './Dashboard.css';
 
 const DocenteDashboard: React.FC = () => {
@@ -26,6 +27,8 @@ const DocenteDashboard: React.FC = () => {
   }, [state.user.isAuthenticated, state.user.es_docente, navigate]);
 
   const handleLogout = () => {
+    const confirmLogout = window.confirm('¿Seguro que deseas cerrar sesión?');
+    if (!confirmLogout) return;
     console.log('Cerrando sesión...');
     localStorage.removeItem('user');
     localStorage.removeItem('access_token');
@@ -117,9 +120,27 @@ const DocenteDashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className="profile-actions">
-                  <button className="profile-action">
+                  <button
+                    className="profile-action"
+                    type="button"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      console.log('Navegando a /mi-perfil');
+                      navigate('/mi-perfil');
+                    }}
+                  >
                     <span className="material-icons">person</span>
                     Mi Perfil
+                  </button>
+                  <button
+                    className="profile-action"
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      navigate('/mi-perfil');
+                    }}
+                  >
+                    <span className="material-icons">settings</span>
+                    Configuración
                   </button>
                   <button className="profile-action" onClick={handleLogout}>
                     <span className="material-icons">logout</span>
@@ -178,7 +199,11 @@ const DocenteDashboard: React.FC = () => {
             </div>
           )}
 
-          {activeSection !== 'dashboard' && (
+          {activeSection === 'calificaciones' && (
+            <NotasPanel />
+          )}
+
+          {activeSection !== 'dashboard' && activeSection !== 'calificaciones' && (
             <div className="section-content">
               <p>Contenido para: <strong>{activeSection}</strong></p>
               <p>Esta sección se desarrollará según las necesidades específicas del docente.</p>

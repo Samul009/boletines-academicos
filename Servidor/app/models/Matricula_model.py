@@ -20,6 +20,8 @@ class MatriculaUpdate(BaseModel):
 class Matricula(MatriculaBase):
     id_matricula: int
     estudiante_nombre: Optional[str] = None
+    persona_nombre: Optional[str] = None
+    persona_identificacion: Optional[str] = None
     grupo_codigo: Optional[str] = None
     grado_nombre: Optional[str] = None
     jornada_nombre: Optional[str] = None

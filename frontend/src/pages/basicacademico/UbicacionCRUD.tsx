@@ -44,7 +44,7 @@ const UbicacionCRUD: React.FC = () => {
       const token = localStorage.getItem('access_token');
       
       if (activeTab === 'paises') {
-        const response = await fetch('http://localhost:8000/ubicacion/paises', {
+        const response = await fetch('http://127.0.0.1:8000/ubicacion/paises', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -56,7 +56,7 @@ const UbicacionCRUD: React.FC = () => {
         console.log('📊 Países cargados:', data);
         setPaises(Array.isArray(data) ? data : []);
       } else if (activeTab === 'departamentos') {
-        const response = await fetch('http://localhost:8000/ubicacion/departamentos', {
+        const response = await fetch('http://127.0.0.1:8000/ubicacion/departamentos', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -68,7 +68,7 @@ const UbicacionCRUD: React.FC = () => {
         console.log('📊 Departamentos cargados:', data);
         setDepartamentos(Array.isArray(data) ? data : []);
       } else if (activeTab === 'ciudades') {
-        const response = await fetch('http://localhost:8000/ubicacion/ciudades', {
+        const response = await fetch('http://127.0.0.1:8000/ubicacion/ciudades', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -90,7 +90,7 @@ const UbicacionCRUD: React.FC = () => {
   const handleDelete = async (entityType: string, id: number) => {
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/ubicacion/${entityType}/${id}`, {
+      const response = await fetch(`http://127.0.0.1:8000/ubicacion/${entityType}/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -136,7 +136,7 @@ const UbicacionCRUD: React.FC = () => {
     <div className="ubicacion-container">
       <div className="ubicacion-header">
         <h2>Ubicaciones</h2>
-        <button className="btn btn-secondary" onClick={() => navigate('/admin/dashboard')}>
+        <button className="btn btn-secondary" onClick={() => navigate('/basic')}>
           <span className="material-icons">arrow_back</span>
           Volver
         </button>

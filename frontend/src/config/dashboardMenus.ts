@@ -39,19 +39,20 @@ export const menuItemsMap: Record<string, MenuItem> = {
   'boletines': { id: 'bulletins', label: 'Boletines', icon: 'description', requiredPermission: '/boletin' },
   'nota': { id: 'nota', label: 'Cargar Notas', icon: 'edit', requiredPermission: '/nota' },
   'docente-asignatura': { id: 'docente-asignatura', label: 'Docente-Asignatura', icon: 'assignment', requiredPermission: '/docente-asignatura' },
-  'usuario-rol': { id: 'usuario-rol', label: 'Usuario-Rol', icon: 'people', requiredPermission: '/usuario-rol' }
+  'usuario-rol': { id: 'usuario-rol', label: 'Usuario-Rol', icon: 'people', requiredPermission: '/usuario-rol' },
+  'reportes': { id: 'reportes', label: 'Reportes', icon: 'assessment', requiredPermission: '/reportes' }
 };
 
 // Categorías de menús
 export const menuCategories = {
-  system: ['dashboard', 'usuarios', 'permisos', 'roles', 'paginas'],
+  system: ['dashboard', 'usuarios', 'permisos', 'roles', 'paginas', 'usuario-rol'],
   basic: ['periodos', 'asignaturas', 'grados', 'jornadas', 'aniolectivo', 'estados-anio', 'tipos-identificacion', 'ubicacion'],
-  academic: ['personas', 'docentes', 'grupos', 'matriculas', 'calificaciones', 'fallas', 'asistencia', 'boletines', 'nota', 'docente-asignatura', 'usuario-rol'],
+  academic: ['personas', 'docentes', 'grupos', 'matriculas', 'calificaciones', 'fallas', 'asistencia', 'boletines', 'nota', 'docente-asignatura'],
   // Las opciones académicas del top bar
-  academic_topbar: ['personas', 'docentes', 'grupos', 'matriculas', 'calificaciones', 'fallas', 'asistencia', 'boletines', 'nota', 'docente-asignatura', 'usuario-rol']
+  academic_topbar: ['personas', 'docentes', 'grupos', 'matriculas', 'reportes', 'asistencia', 'boletines', 'nota', 'docente-asignatura']
 };
 
-// Función para obtener menús basados en permisos del usuario
+// Función para obtener menús basados en permisos del usuarioy
 export const getMenusByPermissions = (userPermissions: any[], isDocente: boolean = false) => {
   const hasPermission = (requiredPermission: string) => {
     if (!requiredPermission) return true; // Sin restricción

@@ -95,13 +95,35 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
                 console.log('No hay usuario o token guardado');
             }
 
-            // Configurar información del sistema
+            // Configurar información del sistema con detección automática de API URL
+            const getApiUrl = () => {
+                // Prioridad: Variable de entorno > Detección automática
+                if (import.meta.env.VITE_API_URL) {
+                    return import.meta.env.VITE_API_URL;
+                }
+                
+                // En desarrollo, usar localhost por defecto
+                if (import.meta.env.DEV) {
+                    return 'http://localhost:8000';
+                }
+                
+                // En producción, usar la misma base que el frontend
+                const protocol = window.location.protocol;
+                const hostname = window.location.hostname;
+                const port = window.location.port;
+                
+                // Si hay puerto específico, usarlo; sino usar 8000 por defecto
+                const apiPort = port ? (parseInt(port) === 3000 ? '8000' : port) : '8000';
+                
+                return `${protocol}//${hostname}:${apiPort}`;
+            };
+
             setState(prev => ({
                 ...prev,
                 systemInfo: {
                     ...prev.systemInfo,
-                    environment: 'development',
-                    apiUrl: 'http://localhost:8000',
+                    environment: import.meta.env.DEV ? 'development' : 'production',
+                    apiUrl: getApiUrl(),
                     version: '1.0.0'
                 }
             }));

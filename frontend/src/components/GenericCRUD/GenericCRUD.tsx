@@ -46,6 +46,13 @@ const GenericCRUD: React.FC<GenericCRUDProps> = ({
   const [relationData, setRelationData] = useState<Record<string, any[]>>({});
   const [selectFilters, setSelectFilters] = useState<Record<string, string>>({});
   const [selectWarnings, setSelectWarnings] = useState<Record<string, boolean>>({});
+  
+  // Estados para selector de ubicación en cascada
+  const [paises, setPaises] = useState<any[]>([]);
+  const [departamentos, setDepartamentos] = useState<any[]>([]);
+  const [ciudades, setCiudades] = useState<any[]>([]);
+  const [selectedPaisPersona, setSelectedPaisPersona] = useState<number | null>(null);
+  const [selectedDepartamentoPersona, setSelectedDepartamentoPersona] = useState<number | null>(null);
 
   // Cargar datos de relaciones dinámicas
   const loadRelationData = async (field: FieldConfig) => {
@@ -71,6 +78,59 @@ const GenericCRUD: React.FC<GenericCRUDProps> = ({
       console.error(`Error loading relation data for ${field.name}:`, error);
     }
   };
+
+  const loadPaises = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch('http://localhost:8000/ubicacion/paises', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const paisesArray = Array.isArray(data) ? data : [];
+        setPaises(paisesArray);
+        // Establecer Colombia por defecto
+        const colombia = paisesArray.find((p: any) => p.nombre.toLowerCase().includes('colombia'));
+        if (colombia) {
+          setSelectedPaisPersona(colombia.id_pais);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading paises:', error);
+    }
+  };
+
+  const loadDepartamentosPorPais = async (paisId: number) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`http://localhost:8000/ubicacion/departamentos?pais_id=${paisId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDepartamentos(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Error loading departamentos:', error);
+      setDepartamentos([]);
+    }
+  };
+
+  const loadCiudadesPorDepartamento = async (departamentoId: number) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const res = await fetch(`http://localhost:8000/ubicacion/ciudades?depto_id=${departamentoId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCiudades(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Error loading ciudades:', error);
+      setCiudades([]);
+    }
+  };
   
   // Cargar datos al montar
   useEffect(() => {
@@ -78,11 +138,38 @@ const GenericCRUD: React.FC<GenericCRUDProps> = ({
     
     // Cargar datos de relaciones dinámicas
     fieldConfig.forEach(field => {
-      if (field.relationEndpoint) {
+      if (field.relationEndpoint && field.name !== 'id_ciudad_nacimiento') {
         loadRelationData(field);
       }
     });
+
+    // Cargar países si hay campo de ciudad
+    const hasCiudadField = fieldConfig.some(f => f.name === 'id_ciudad_nacimiento');
+    if (hasCiudadField) {
+      loadPaises();
+    }
   }, [apiEndpoint]);
+
+  // Cargar departamentos cuando se seleccione un país
+  useEffect(() => {
+    if (selectedPaisPersona) {
+      loadDepartamentosPorPais(selectedPaisPersona);
+      setSelectedDepartamentoPersona(null);
+      setCiudades([]);
+    } else {
+      setDepartamentos([]);
+      setCiudades([]);
+    }
+  }, [selectedPaisPersona]);
+
+  // Cargar ciudades cuando se seleccione un departamento
+  useEffect(() => {
+    if (selectedDepartamentoPersona) {
+      loadCiudadesPorDepartamento(selectedDepartamentoPersona);
+    } else {
+      setCiudades([]);
+    }
+  }, [selectedDepartamentoPersona]);
   
   // Calcular items filtrados y paginados
   const filteredItems = items.filter(item => {
@@ -146,15 +233,77 @@ const GenericCRUD: React.FC<GenericCRUDProps> = ({
     }
   };
 
+  const closeModal = () => {
+    setShowModal(false);
+    // Resetear estados de ubicación si existe el campo
+    const hasCiudadField = fieldConfig.some(f => f.name === 'id_ciudad_nacimiento');
+    if (hasCiudadField) {
+      // Mantener Colombia seleccionado por defecto
+      if (paises.length > 0) {
+        const colombia = paises.find((p: any) => p.nombre.toLowerCase().includes('colombia'));
+        if (colombia) {
+          setSelectedPaisPersona(colombia.id_pais);
+        }
+      }
+      setSelectedDepartamentoPersona(null);
+      setCiudades([]);
+    }
+  };
+
   const handleCreate = () => {
     setEditingItem(null);
     setFormData({});
+    // Resetear estados de ubicación si existe el campo
+    const hasCiudadField = fieldConfig.some(f => f.name === 'id_ciudad_nacimiento');
+    if (hasCiudadField) {
+      // Mantener Colombia seleccionado si ya estaba
+      if (!selectedPaisPersona && paises.length > 0) {
+        const colombia = paises.find((p: any) => p.nombre.toLowerCase().includes('colombia'));
+        if (colombia) {
+          setSelectedPaisPersona(colombia.id_pais);
+        }
+      }
+    }
     setShowModal(true);
   };
 
-  const handleEdit = (item: any) => {
+  const handleEdit = async (item: any) => {
     setEditingItem(item);
     setFormData(item);
+    // Si tiene ciudad, intentar cargar país y departamento
+    if (item.id_ciudad_nacimiento) {
+      try {
+        const token = localStorage.getItem('access_token');
+        // Obtener información de la ciudad
+        const ciudadRes = await fetch(`http://localhost:8000/ubicacion/ciudades/${item.id_ciudad_nacimiento}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (ciudadRes.ok) {
+          const ciudadData = await ciudadRes.json();
+          if (ciudadData.id_departamento) {
+            // Obtener información del departamento
+            const deptoRes = await fetch(`http://localhost:8000/ubicacion/departamentos/${ciudadData.id_departamento}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (deptoRes.ok) {
+              const deptoData = await deptoRes.json();
+              if (deptoData.id_pais) {
+                // Primero establecer país y cargar departamentos
+                setSelectedPaisPersona(deptoData.id_pais);
+                await loadDepartamentosPorPais(deptoData.id_pais);
+                // Luego establecer departamento y cargar ciudades
+                setTimeout(() => {
+                  setSelectedDepartamentoPersona(ciudadData.id_departamento);
+                  loadCiudadesPorDepartamento(ciudadData.id_departamento);
+                }, 100);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading ciudad info:', error);
+      }
+    }
     setShowModal(true);
   };
 
@@ -229,7 +378,7 @@ const GenericCRUD: React.FC<GenericCRUDProps> = ({
         throw new Error(errorMessage);
       }
       
-      setShowModal(false);
+      closeModal();
       loadData();
     } catch (error: any) {
       console.error('Error saving:', error);
@@ -243,6 +392,72 @@ const GenericCRUD: React.FC<GenericCRUDProps> = ({
 
   const renderField = (field: FieldConfig) => {
     const value = formData[field.name] || '';
+    
+    // Renderizar selector en cascada para ubicación
+    if (field.name === 'id_ciudad_nacimiento') {
+      return (
+        <div>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 500, fontSize: '12px' }}>País</label>
+            <select
+              value={selectedPaisPersona || ''}
+              onChange={(e) => {
+                const paisId = e.target.value ? parseInt(e.target.value) : null;
+                setSelectedPaisPersona(paisId);
+                handleChange(field.name, '');
+              }}
+              style={{ width: '100%', padding: '10px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px' }}
+            >
+              <option value="">-- Seleccione --</option>
+              {paises.map((pais: any) => (
+                <option key={pais.id_pais} value={pais.id_pais}>
+                  {pais.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 500, fontSize: '12px' }}>Departamento</label>
+            <select
+              value={selectedDepartamentoPersona || ''}
+              onChange={(e) => {
+                const deptoId = e.target.value ? parseInt(e.target.value) : null;
+                setSelectedDepartamentoPersona(deptoId);
+                handleChange(field.name, '');
+              }}
+              disabled={!selectedPaisPersona}
+              style={{ width: '100%', padding: '10px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', opacity: !selectedPaisPersona ? 0.6 : 1 }}
+            >
+              <option value="">-- Seleccione --</option>
+              {departamentos.map((depto: any) => (
+                <option key={depto.id_departamento} value={depto.id_departamento}>
+                  {depto.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 500, fontSize: '12px' }}>Ciudad/Municipio</label>
+            <select
+              value={value || ''}
+              onChange={(e) => handleChange(field.name, e.target.value ? parseInt(e.target.value) : null)}
+              disabled={!selectedDepartamentoPersona}
+              style={{ width: '100%', padding: '10px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', opacity: !selectedDepartamentoPersona ? 0.6 : 1 }}
+              required={field.required}
+            >
+              <option value="">-- Seleccione --</option>
+              {ciudades.map((ciudad: any) => (
+                <option key={ciudad.id_ciudad} value={ciudad.id_ciudad}>
+                  {ciudad.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      );
+    }
     
     // Si hay relación dinámica, usar esos datos
     let selectOptions = field.options || [];
@@ -477,11 +692,11 @@ const GenericCRUD: React.FC<GenericCRUDProps> = ({
 
       {/* Modal para Crear/Editar */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{editingItem ? 'Editar' : 'Crear Nuevo'} {title}</h3>
-              <button className="btn-icon" onClick={() => setShowModal(false)}>
+              <button className="btn-icon" onClick={closeModal}>
                 <span className="material-icons">close</span>
               </button>
             </div>
@@ -495,7 +710,7 @@ const GenericCRUD: React.FC<GenericCRUDProps> = ({
                 </div>
               ))}
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                <button type="button" className="btn btn-secondary" onClick={closeModal}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">

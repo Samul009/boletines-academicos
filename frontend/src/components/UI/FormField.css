@@ -1,0 +1,175 @@
+/* FormField - Estilos Profesionales */
+.form-field {
+  margin-bottom: 20px;
+  position: relative;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+
+.form-field-label .field-icon {
+  font-size: 18px;
+  color: var(--primary-color);
+}
+
+.required-mark {
+  color: var(--error);
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+.form-field-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-secondary);
+  font-size: 20px;
+  pointer-events: none;
+  transition: color 0.2s;
+  z-index: 1;
+}
+
+.form-field-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: white;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.form-field-input.with-icon {
+  padding-left: 44px;
+}
+
+.form-field-input:hover:not(:disabled) {
+  border-color: #bdbdbd;
+}
+
+.form-field-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+}
+
+.form-field-input:focus + .input-icon,
+.form-field-input:focus ~ .input-icon {
+  color: var(--primary-color);
+}
+
+.form-field-input:disabled {
+  background: #f5f5f5;
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.form-field-input.error {
+  border-color: var(--error);
+  background: #fff5f5;
+}
+
+.form-field-input.error:focus {
+  box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.1);
+}
+
+/* Select específico */
+select.form-field-input {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+/* Textarea específico */
+textarea.form-field-input {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+/* Helper text */
+.form-field-helper {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  padding-left: 4px;
+}
+
+/* Error message */
+.form-field-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--error);
+  margin-top: 6px;
+  padding-left: 4px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-field-error .material-icons {
+  font-size: 16px;
+}
+
+/* Estados del campo */
+.form-field.has-error .form-field-label {
+  color: var(--error);
+}
+
+.form-field.has-error .input-icon {
+  color: var(--error);
+}
+
+.form-field.disabled {
+  opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .form-field-input {
+    font-size: 16px; /* Evita zoom en móviles */
+  }
+}
