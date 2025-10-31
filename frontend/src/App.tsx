@@ -6,7 +6,9 @@ import UserProfile from './pages/Profile/UserProfile';
 
 // Pages
 import Home from './pages/Home/Home';
-import Login from './pages/Auth/Login';
+import AdminLogin from './pages/Auth/AdminLogin';
+import DocenteLogin from './pages/Auth/DocenteLogin';
+import DeveloperLogin from './pages/Auth/DeveloperLogin';
 import AdminDashboard from './pages/Admin/Dashboard';
 import DocenteDashboard from './pages/Docente/Dashboard';
 import DeveloperDashboard from './pages/Developer/Dashboard';
@@ -27,13 +29,11 @@ const App: React.FC = () => {
             {/* Página principal */}
             <Route path="/" element={<Home />} />
             
-            {/* Login único que identifica roles automáticamente */}
-            <Route path="/login" element={<Login />} />
-            
-            {/* Rutas de login de compatibilidad (redirigen al login único) */}
-            <Route path="/login/admin" element={<Login />} />
-            <Route path="/login/docente" element={<Login />} />
-            <Route path="/developer/login" element={<Login />} />
+            {/* Logins por rol */}
+            <Route path="/login" element={<AdminLogin />} />
+            <Route path="/login/admin" element={<AdminLogin />} />
+            <Route path="/login/docente" element={<DocenteLogin />} />
+            <Route path="/developer/login" element={<DeveloperLogin />} />
             
             {/* Dashboards específicos por tipo de usuario */}
             <Route path="/dashboard" element={<AdminDashboard />} />

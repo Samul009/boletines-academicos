@@ -13,12 +13,14 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     // Acciones para manejar el estado
     const actions: AppActions = {
         setUser: (user: User) => {
+            const isAuthenticated = user.isAuthenticated !== undefined ? user.isAuthenticated : true;
+            const normalizedUser = { ...user, isAuthenticated };
             setState(prev => ({
                 ...prev,
-                user: { ...user, isAuthenticated: true }
+                user: normalizedUser
             }));
             // Guardar en localStorage para persistencia
-            localStorage.setItem('user', JSON.stringify(user));
+            localStorage.setItem('user', JSON.stringify(normalizedUser));
         },
 
         toggleDeveloperPanel: () => {
@@ -81,7 +83,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
                     // Restaurar usuario directamente en el estado
                     setState(prev => ({
                         ...prev,
-                        user: { ...user, isAuthenticated: true }
+                        user: { ...user, isAuthenticated: user.isAuthenticated !== undefined ? user.isAuthenticated : true }
                     }));
                     
                     console.log('Usuario restaurado exitosamente');

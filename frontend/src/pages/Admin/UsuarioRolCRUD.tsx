@@ -18,7 +18,7 @@ interface UsuarioRol {
 }
 
 const UsuarioRolCRUD: React.FC = () => {
-  const { get, post, del } = useApi();
+  const { get, post, delete: del } = useApi();
   const [items, setItems] = useState<UsuarioRol[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);

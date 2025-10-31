@@ -86,55 +86,70 @@ const Login: React.FC<LoginProps> = ({
         method: 'GET'
       });
       
-      // Procesar permisos detallados
+      // Procesar permisos detallados en el formato esperado
       const detailedPermissions = userProfile.permisos?.map((permiso: any) => ({
         pagina: {
-          id: permiso.pagina?.id_pagina,
+          id_pagina: permiso.pagina?.id_pagina,
           nombre: permiso.pagina?.nombre,
           ruta: permiso.pagina?.ruta
         },
-        acciones: {
-          puede_ver: permiso.puede_ver,
-          puede_crear: permiso.puede_crear,
-          puede_editar: permiso.puede_editar,
-          puede_eliminar: permiso.puede_eliminar
-        }
+        puede_ver: permiso.puede_ver,
+        puede_crear: permiso.puede_crear,
+        puede_editar: permiso.puede_editar,
+        puede_eliminar: permiso.puede_eliminar
       })) || [];
 
-      // Identificar roles del usuario
-      const userRoles: string[] = [];
       const pageRoutes = detailedPermissions.map((p: any) => p.pagina.ruta?.toLowerCase() || '');
       const pageNames = detailedPermissions.map((p: any) => p.pagina.nombre?.toLowerCase() || '');
-      
-      // Detectar rol de desarrollador
-      if (pageRoutes.some((route: string) => route.includes('developer') || route.includes('/dev')) ||
-          pageNames.some((name: string) => name.includes('desarrollador') || name.includes('developer'))) {
-        userRoles.push('developer');
-      }
-      
-      // Detectar rol de administrador
-      if (pageRoutes.some((route: string) => route.includes('admin') || route.includes('usuario') || route.includes('permiso')) ||
-          pageNames.some((name: string) => name.includes('administr') || name.includes('usuario') || name.includes('permiso'))) {
-        userRoles.push('admin');
-      }
-      
-      // Detectar rol de docente
-      if (pageRoutes.some((route: string) => route.includes('nota') || route.includes('calificacion') || route.includes('boletin')) ||
-          pageNames.some((name: string) => name.includes('nota') || name.includes('calificacion') || name.includes('docente'))) {
-        userRoles.push('docente');
+
+      // Normalizar roles provenientes del backend
+      const backendRoles: string[] = Array.isArray(userProfile.roles) ? userProfile.roles : [];
+      const normalizedRoles = new Set<string>();
+
+      backendRoles.forEach((rol) => {
+        const roleLower = (rol || '').toLowerCase();
+        if (!roleLower) return;
+        if (roleLower.includes('desarroll')) normalizedRoles.add('developer');
+        else if (roleLower.includes('admin')) normalizedRoles.add('admin');
+        else if (roleLower.includes('docent')) normalizedRoles.add('docente');
+        else normalizedRoles.add(roleLower);
+      });
+
+      const esDocenteFlag = Boolean(userProfile.es_docente);
+      const esDirectorFlag = Boolean(userProfile.es_director_grupo);
+
+      if (esDocenteFlag) {
+        normalizedRoles.add('docente');
       }
 
-      // Verificar si el usuario tiene el rol requerido para este login
-      if (roleType !== 'admin' && !userRoles.includes(roleType)) {
-        setLoginError(`Acceso denegado: No tienes permisos de ${roleType}`);
+      // Fallback: inferir roles por permisos si no hay roles explícitos
+      if (normalizedRoles.size === 0) {
+        if (pageRoutes.some((route: string) => route.includes('developer') || route.includes('/dev')) ||
+            pageNames.some((name: string) => name.includes('desarrollador') || name.includes('developer'))) {
+          normalizedRoles.add('developer');
+        }
+        if (pageRoutes.some((route: string) => route.includes('admin') || route.includes('usuario') || route.includes('permiso')) ||
+            pageNames.some((name: string) => name.includes('administr') || name.includes('usuario') || name.includes('permiso'))) {
+          normalizedRoles.add('admin');
+        }
+        if (pageRoutes.some((route: string) => route.includes('nota') || route.includes('calificacion') || route.includes('boletin')) ||
+            pageNames.some((name: string) => name.includes('nota') || name.includes('calificacion') || name.includes('docente'))) {
+          normalizedRoles.add('docente');
+        }
+      }
+
+      const userRoles = Array.from(normalizedRoles);
+
+      // Validaciones según el tipo de login
+      if (roleType === 'docente' && !esDocenteFlag) {
+        setLoginError('Acceso denegado: esta sección es exclusiva para docentes');
         localStorage.removeItem('access_token');
         localStorage.removeItem('token_type');
         return;
       }
 
-      // Para admin, verificar que tenga permisos administrativos
-      if (roleType === 'admin' && !userRoles.includes('admin')) {
-        setLoginError('Acceso denegado: Se requieren permisos de administrador');
+      if (roleType === 'developer' && !userRoles.includes('developer')) {
+        setLoginError('Acceso denegado: se requieren permisos de desarrollador');
         localStorage.removeItem('access_token');
         localStorage.removeItem('token_type');
         return;
@@ -146,6 +161,8 @@ const Login: React.FC<LoginProps> = ({
         username: userProfile.username,
         permissions: pageRoutes,
         isAuthenticated: true,
+        es_docente: esDocenteFlag,
+        es_director_grupo: esDirectorFlag,
         persona: userProfile.persona,
         roles: userRoles,
         detailedPermissions: detailedPermissions

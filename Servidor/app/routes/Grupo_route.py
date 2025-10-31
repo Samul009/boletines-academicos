@@ -13,8 +13,10 @@ from ..models.models import (
     Jornada as JornadaDB,
     AnioLectivo,
     Usuario, # <--- Se usa el modelo Usuario
-    Matricula
+    Matricula,
+    DocenteAsignatura
 )
+from .Docente_asignatura_route import _expandir_asignacion_a_grupos
 
 router = APIRouter(prefix="/grupos", tags=["Grupos"])
 
@@ -142,7 +144,46 @@ def crear_grupo(
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
-    return {"mensaje": "✅ Grupo creado", "id_grupo": nuevo.id_grupo}
+
+    docentes_actualizados = 0
+    docentes_creados = 0
+
+    asignaciones_relacionadas = db.query(DocenteAsignatura).filter(
+        DocenteAsignatura.id_grado == nuevo.id_grado,
+        DocenteAsignatura.id_anio_lectivo == nuevo.id_anio_lectivo,
+        DocenteAsignatura.fecha_eliminacion.is_(None)
+    ).all()
+
+    hubo_cambios = False
+    procesados = set()
+    for asignacion in asignaciones_relacionadas:
+        key = (asignacion.id_persona_docente, asignacion.id_asignatura)
+        if key in procesados:
+            continue
+        expandio, creados = _expandir_asignacion_a_grupos(
+            db,
+            asignacion,
+            fallback_grado=nuevo.id_grado,
+            fallback_anio=nuevo.id_anio_lectivo,
+        )
+        if expandio:
+            asignacion.fecha_actualizacion = datetime.now()
+            docentes_actualizados += 1
+            hubo_cambios = True
+        if creados:
+            docentes_creados += creados
+            hubo_cambios = True
+        procesados.add(key)
+
+    if hubo_cambios:
+        db.commit()
+
+    return {
+        "mensaje": "✅ Grupo creado",
+        "id_grupo": nuevo.id_grupo,
+        "docentes_actualizados": docentes_actualizados,
+        "docentes_nuevos": docentes_creados,
+    }
 
 
 # ====================

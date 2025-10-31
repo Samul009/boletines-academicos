@@ -132,7 +132,7 @@ const OptionsPanel: React.FC<OptionsPanelProps> = ({
       
       {/* Botón oculto de desarrollador */}
       <HiddenButton 
-        onClick={() => navigate('/login')}
+        onClick={() => navigate('/developer/login')}
         isVisible={true}
       />
     </div>

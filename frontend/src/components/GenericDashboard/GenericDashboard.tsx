@@ -53,6 +53,12 @@ const GenericDashboard: React.FC<DashboardProps> = ({
     return getMenusByPermissions(state.user.detailedPermissions || [], isDocente);
   }, [state.user.detailedPermissions, state.user.es_docente]);
   
+  const topMenuIds = topMenuItems.map(item => item.id);
+  const hasPersonalSection = topMenuIds.some(id => ['personas', 'docentes', 'grupos', 'matriculas', 'teachers', 'people', 'usuario-rol', 'enrollments'].includes(id));
+  const hasAdminAcademicaSection = topMenuIds.some(id => ['docente-asignatura', 'grados', 'grado-asignatura', 'boletines', 'nota', 'reportes'].includes(id));
+  const hasReporteNotasSection = topMenuIds.some(id => ['reportes', 'boletines', 'nota'].includes(id));
+  const showTopNavigation = hasBasicPermissions || hasPersonalSection || hasAdminAcademicaSection || hasReporteNotasSection;
+
   const [activeSection, setActiveSection] = useState<string>('dashboard');
   
   useEffect(() => {
@@ -135,13 +141,50 @@ const GenericDashboard: React.FC<DashboardProps> = ({
     navigate('/');
   };
 
+  const navigateToSection = React.useCallback((section: string, extraParams?: Record<string, string>) => {
+    const params = new URLSearchParams();
+    params.set('section', section);
+
+    if (section === 'reportes' && !(extraParams && extraParams.tab)) {
+      params.set('tab', 'reporte-notas');
+    }
+
+    if (extraParams) {
+      Object.entries(extraParams).forEach(([key, value]) => {
+        params.set(key, value);
+      });
+    }
+
+    setActiveSection(section);
+    navigate(`/admin/dashboard?${params.toString()}`);
+  }, [navigate]);
+
   const handleMenuClick = (menuItem: MenuItem) => {
     if (menuItem.action) {
       menuItem.action();
     } else {
-      setActiveSection(menuItem.id);
+      navigateToSection(menuItem.id);
     }
   };
+
+  React.useEffect(() => {
+    if (!hasBasicPermissions && activeSection === 'basicos') {
+      setActiveSection('dashboard');
+      return;
+    }
+    if (!hasPersonalSection && activeSection === 'people') {
+      setActiveSection('dashboard');
+      return;
+    }
+    if (!hasAdminAcademicaSection && activeSection === 'admin-academica') {
+      setActiveSection('dashboard');
+      return;
+    }
+    if (!hasReporteNotasSection && activeSection === 'reportes') {
+      setActiveSection('dashboard');
+      return;
+    }
+  }, [hasBasicPermissions, hasPersonalSection, hasAdminAcademicaSection, hasReporteNotasSection, activeSection]);
 
   const getRoleIcon = () => {
     if (isTeacherView) return 'school';
@@ -289,51 +332,58 @@ const GenericDashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Fila inferior: navegación académica dentro del header */}
-            <nav className="academic-nav">
-                {/* Solo mostrar botón "Básico" si el usuario tiene permisos para al menos una tabla básica */}
-                {hasBasicPermissions && (
+            {showTopNavigation && (
+              <nav className="academic-nav">
+                  {hasBasicPermissions && (
+                    <button
+                      key="basicos"
+                      className={`academic-nav-item ${activeSection === 'basicos' ? 'active' : ''}`}
+                      onClick={() => navigateToSection('basicos')}
+                    >
+                      <span className="material-icons">storage</span>
+                      <span>Básico</span>
+                    </button>
+                  )}
+                  {hasPersonalSection && (
+                    <button
+                      key="people"
+                      className={`academic-nav-item ${activeSection === 'people' ? 'active' : ''}`}
+                      onClick={() => navigateToSection('people')}
+                    >
+                      <span className="material-icons">groups_2</span>
+                      <span>Personal Académico</span>
+                    </button>
+                  )}
+                  {hasAdminAcademicaSection && (
+                    <button
+                      key="admin-academica"
+                      className={`academic-nav-item ${activeSection === 'admin-academica' ? 'active' : ''}`}
+                      onClick={() => navigateToSection('admin-academica')}
+                    >
+                      <span className="material-icons">school</span>
+                      <span>Administración Académica</span>
+                    </button>
+                  )}
+                  {hasReporteNotasSection && (
+                    <button
+                      key="reportes"
+                      className={`academic-nav-item ${activeSection === 'reportes' ? 'active' : ''}`}
+                      onClick={() => navigateToSection('reportes', { tab: 'reporte-notas' })}
+                    >
+                      <span className="material-icons">assessment</span>
+                      <span>Reporte de Notas</span>
+                    </button>
+                  )}
                   <button
-                    key="basicos"
-                    className={`academic-nav-item ${activeSection === 'basicos' ? 'active' : ''}`}
-                    onClick={() => setActiveSection('basicos')}
+                    key="help"
+                    className={`academic-nav-item ${activeSection === 'help' ? 'active' : ''}`}
+                    onClick={() => navigateToSection('help')}
                   >
-                    <span className="material-icons">storage</span>
-                    <span>Básico</span>
+                    <span className="material-icons">help_outline</span>
+                    <span>Ayuda</span>
                   </button>
-                )}
-                <button
-                  key="people"
-                  className={`academic-nav-item ${activeSection === 'people' ? 'active' : ''}`}
-                  onClick={() => setActiveSection('people')}
-                >
-                  <span className="material-icons">groups_2</span>
-                  <span>Personal Académico</span>
-                </button>
-                <button
-                  key="admin-academica"
-                  className={`academic-nav-item ${activeSection === 'admin-academica' ? 'active' : ''}`}
-                  onClick={() => setActiveSection('admin-academica')}
-                >
-                  <span className="material-icons">school</span>
-                  <span>Administración Académica</span>
-                </button>
-                <button
-                  key="reporte-notas"
-                  className={`academic-nav-item ${activeSection === 'reporte-notas' ? 'active' : ''}`}
-                  onClick={() => setActiveSection('reporte-notas')}
-                >
-                  <span className="material-icons">assessment</span>
-                  <span>Reporte de Notas</span>
-                </button>
-                <button
-                  key="help"
-                  className={`academic-nav-item ${activeSection === 'help' ? 'active' : ''}`}
-                  onClick={() => setActiveSection('help')}
-                >
-                  <span className="material-icons">help_outline</span>
-                  <span>Ayuda</span>
-                </button>
-            </nav>
+              </nav>
+            )}
           </div>
 
           <div className="content-header">

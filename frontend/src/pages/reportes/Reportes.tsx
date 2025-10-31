@@ -1,113 +1,100 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import CalificacionesFallasCRUD from './CalificacionesFallasCRUD';
+import ReporteNotasPanel from './ReporteNotasPanel';
 import './Reportes.css';
 
-const REPORTES_ITEMS = [
-  {
-    id: 'calificaciones-fallas',
-    title: 'Calificaciones y Fallas',
-    description: 'Gestión y consulta de calificaciones y fallas de estudiantes',
-    icon: 'assessment',
-    route: '/reportes/calificaciones-fallas'
-  },
+const OVERVIEW_ITEMS = [
   {
     id: 'reporte-notas',
     title: 'Reporte de Notas',
-    description: 'Generar reportes y boletines de calificaciones por período',
-    icon: 'description',
-    route: '/reportes/notas'
+    description: 'Ingreso y control de calificaciones mediante el nuevo panel optimizado.',
+    icon: 'description'
   }
 ];
+
+const ensureReportesQuery = (search: string, desiredTab: 'overview' | 'reporte-notas'): string => {
+  const params = new URLSearchParams(search);
+  params.set('section', 'reportes');
+  params.delete('legacy');
+  if (params.get('tab') !== desiredTab) {
+    params.set('tab', desiredTab);
+  }
+  return params.toString();
+};
 
 const Reportes: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeSection, setActiveSection] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
+  const currentView: 'overview' | 'panel' = React.useMemo(() => {
     const params = new URLSearchParams(location.search);
-    const tab = params.get('tab');
-    if (tab === 'calificaciones-fallas' || tab === 'reporte-notas') {
-      setActiveSection(tab);
-    }
+    return params.get('tab') === 'overview' ? 'overview' : 'panel';
   }, [location.search]);
 
-  const handleClick = (item: typeof REPORTES_ITEMS[0]) => {
-    setActiveSection(item.id);
-    window.history.pushState({}, '', `/admin/dashboard?section=reportes&tab=${item.id}`);
+  React.useEffect(() => {
+    const expectedTab = currentView === 'overview' ? 'overview' : 'reporte-notas';
+    const normalized = ensureReportesQuery(location.search, expectedTab);
+    if (normalized !== location.search.replace(/^[?]/, '')) {
+      navigate(`/admin/dashboard?${normalized}`, { replace: true });
+    }
+  }, [location.search, navigate, currentView]);
+
+  const openPanel = () => {
+    const normalized = ensureReportesQuery('', 'reporte-notas');
+    navigate(`/admin/dashboard?${normalized}`);
   };
 
-  if (activeSection === 'calificaciones-fallas' || activeSection === null) {
+  const goToOverview = () => {
+    const normalized = ensureReportesQuery('', 'overview');
+    navigate(`/admin/dashboard?${normalized}`);
+  };
+
+  if (currentView === 'overview') {
     return (
       <div className="dashboard-overview">
-        {activeSection === null && (
-          <div className="overview-cards">
-            {REPORTES_ITEMS.map(item => (
-              <div
-                key={item.id}
-                className="overview-card"
-                onClick={() => handleClick(item)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleClick(item);
-                  }
-                }}
-              >
-                <span className="material-icons">{item.icon}</span>
-                <div>
-                  <h3>{item.title}</h3>
-                  <p>{item.description}</p>
-                </div>
+        <div className="overview-cards">
+          {OVERVIEW_ITEMS.map(item => (
+            <div
+              key={item.id}
+              className="overview-card"
+              onClick={openPanel}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openPanel();
+                }
+              }}
+            >
+              <span className="material-icons">{item.icon}</span>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
               </div>
-            ))}
-          </div>
-        )}
-        {activeSection === 'calificaciones-fallas' && (
-          <div>
-            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => setActiveSection(null)}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-              >
-                <span className="material-icons">arrow_back</span>
-                Volver
-              </button>
-              <h2 style={{ margin: 0 }}>Calificaciones y Fallas</h2>
             </div>
-            <CalificacionesFallasCRUD />
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (activeSection === 'reporte-notas') {
-    return (
-      <div className="dashboard-overview">
-        <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button 
-            className="btn btn-secondary" 
-            onClick={() => setActiveSection(null)}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-          >
-            <span className="material-icons">arrow_back</span>
-            Volver
-          </button>
-          <h2 style={{ margin: 0 }}>Reporte de Notas</h2>
-        </div>
-        <div className="reporte-notas-container" style={{ padding: '20px' }}>
-          <p>Funcionalidad de Reporte de Notas en desarrollo...</p>
+          ))}
         </div>
       </div>
     );
   }
 
-  return null;
+  return (
+    <div className="dashboard-overview">
+      <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button 
+          className="btn btn-secondary" 
+          onClick={goToOverview}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <span className="material-icons">arrow_back</span>
+          Volver
+        </button>
+        <h2 style={{ margin: 0 }}>Reporte de Notas</h2>
+      </div>
+      <ReporteNotasPanel />
+    </div>
+  );
 };
 
 export default Reportes;

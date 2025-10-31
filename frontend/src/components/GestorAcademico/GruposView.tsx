@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 interface Grado {
   id_grado: number;
@@ -164,6 +164,31 @@ const GruposView: React.FC<GruposViewProps> = ({ grado, anio, onVolver }) => {
   const [grupoEstudiantes, setGrupoEstudiantes] = useState<any[]>([]);
   const [grupoAsignaturas, setGrupoAsignaturas] = useState<any[]>([]);
   const [grupoDocentes, setGrupoDocentes] = useState<any[]>([]);
+  const docentesVisibles = useMemo(() => {
+    if (!grupoDocentes.length) return [];
+
+    const mapa = new Map<number, any>();
+    grupoDocentes.forEach((doc) => {
+      const asignaturaId = doc?.id_asignatura;
+      if (!asignaturaId) return;
+
+      const esEspecifico = viewingGrupo && doc?.id_grupo === viewingGrupo.id_grupo;
+      const existente = mapa.get(asignaturaId);
+
+      if (!existente) {
+        mapa.set(asignaturaId, doc);
+        return;
+      }
+
+      const existenteEsGeneral = !existente.id_grupo;
+
+      if (existenteEsGeneral && esEspecifico) {
+        mapa.set(asignaturaId, doc);
+      }
+    });
+
+    return Array.from(mapa.values());
+  }, [grupoDocentes, viewingGrupo]);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [tieneMultiplesGrupos, setTieneMultiplesGrupos] = useState(false);
   const [showAsignarDocenteModal, setShowAsignarDocenteModal] = useState(false);
@@ -805,10 +830,13 @@ const GruposView: React.FC<GruposViewProps> = ({ grado, anio, onVolver }) => {
                     ) : (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '10px' }}>
                         {grupoAsignaturas.map((asig: any) => {
-                          // Buscar si hay un docente específico para este grupo
-                          const docenteGrupo = grupoDocentes.find(
-                            d => d.id_asignatura === asig.id_asignatura && d.id_grupo === viewingGrupo?.id_grupo
+                          // Buscar docente disponible para este grupo (prioriza asignación específica)
+                          const docenteGrupo = docentesVisibles.find(
+                            (d) => d.id_asignatura === asig.id_asignatura
                           );
+                          const etiquetaGrupo = docenteGrupo?.id_grupo
+                            ? (docenteGrupo.grupo_nombre || `Grupo ${docenteGrupo.id_grupo}`)
+                            : 'Todos los grupos';
                           
                           return (
                             <div key={asig.id_grado_asignatura} style={{
@@ -838,6 +866,9 @@ const GruposView: React.FC<GruposViewProps> = ({ grado, anio, onVolver }) => {
                                       border: '1px solid #c3e6cb'
                                     }}>
                                       <strong>👨‍🏫 Docente:</strong> {docenteGrupo.docente_nombre}
+                                      <span style={{ marginLeft: '6px', fontStyle: 'italic', color: '#155724' }}>
+                                        ({etiquetaGrupo})
+                                      </span>
                                     </div>
                                   ) : (
                                     <div style={{ 
@@ -894,9 +925,9 @@ const GruposView: React.FC<GruposViewProps> = ({ grado, anio, onVolver }) => {
                       gap: '8px'
                     }}>
                       <span className="material-icons">person</span>
-                      Docentes ({grupoDocentes.length})
+                      Docentes ({docentesVisibles.length})
                     </h4>
-                    {grupoDocentes.length === 0 ? (
+                    {docentesVisibles.length === 0 ? (
                       <div style={{ padding: '20px', textAlign: 'center', background: '#f8f9fa', borderRadius: '4px', color: '#666' }}>
                         No hay docentes asignados específicamente a este grupo
                       </div>
@@ -911,11 +942,16 @@ const GruposView: React.FC<GruposViewProps> = ({ grado, anio, onVolver }) => {
                             </tr>
                           </thead>
                           <tbody>
-                            {grupoDocentes.map((doc: any, idx: number) => (
+                            {docentesVisibles.map((doc: any, idx: number) => (
                               <tr key={idx} style={{ borderBottom: '1px solid #dee2e6' }}>
                                 <td style={{ padding: '8px' }}>{doc.docente_nombre || '-'}</td>
                                 <td style={{ padding: '8px' }}>{doc.asignatura_nombre || '-'}</td>
-                                <td style={{ padding: '8px' }}>{doc.docente_identificacion || '-'}</td>
+                                <td style={{ padding: '8px' }}>
+                                  {doc.docente_identificacion || '-'}
+                                  <span style={{ marginLeft: '6px', fontSize: '11px', color: '#0c5460' }}>
+                                    ({doc.id_grupo ? (doc.grupo_nombre || `Grupo ${doc.id_grupo}`) : 'Todos los grupos'})
+                                  </span>
+                                </td>
                               </tr>
                             ))}
                           </tbody>

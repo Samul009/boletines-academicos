@@ -33,7 +33,7 @@ interface Falla {
 }
 
 const CalificacionesFallasCRUD: React.FC = () => {
-  const { get, post, put, del } = useApi();
+  const { get, post, put, delete: del } = useApi();
   const [activeTab, setActiveTab] = useState<'calificaciones' | 'fallas'>('calificaciones');
   const [calificaciones, setCalificaciones] = useState<Calificacion[]>([]);
   const [fallas, setFallas] = useState<Falla[]>([]);

@@ -2,7 +2,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, aliased, joinedload
 from sqlalchemy.sql import func, and_, select
-from typing import List, Optional
+from sqlalchemy import or_
+from typing import List, Optional, Tuple
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -32,6 +33,7 @@ class EstudianteNotaSchema(BaseModel):
     id_persona: int
     nombre: str
     apellido: str
+    numero_identificacion: Optional[str] = None
     foto: Optional[str] = None
     calificacion_actual: Optional[float] = None
     id_calificacion: Optional[int] = None
@@ -99,6 +101,7 @@ class EstudianteClaseSchema(BaseModel):
     id_persona: int
     nombre: str
     apellido: str
+    numero_identificacion: Optional[str] = None
     foto: Optional[str] = None
 
     class Config:
@@ -117,6 +120,101 @@ class ClaseInfoSchema(BaseModel):
         from_attributes = True
 
 
+
+
+# ==============================
+def _expandir_asignacion_a_grupos(
+    db: Session,
+    asignacion: DocenteAsignatura,
+    fallback_grado: Optional[int] = None,
+    fallback_anio: Optional[int] = None,
+) -> Tuple[bool, int]:
+    grado_id = asignacion.id_grado or fallback_grado
+    anio_id = asignacion.id_anio_lectivo or fallback_anio
+
+    if grado_id is None or anio_id is None:
+        return False, 0
+
+    grupos_relacionados = db.query(Grupo.id_grupo).filter(
+        Grupo.id_grado == grado_id,
+        Grupo.id_anio_lectivo == anio_id,
+        Grupo.fecha_eliminacion.is_(None)
+    ).order_by(Grupo.id_grupo.asc()).all()
+
+    if not grupos_relacionados:
+        return False, 0
+
+    cambios = False
+    nuevos_creados = 0
+
+    registros_existentes = db.query(DocenteAsignatura).filter(
+        DocenteAsignatura.id_persona_docente == asignacion.id_persona_docente,
+        DocenteAsignatura.id_asignatura == asignacion.id_asignatura,
+        DocenteAsignatura.id_grado == grado_id,
+        DocenteAsignatura.id_anio_lectivo == anio_id,
+        DocenteAsignatura.fecha_eliminacion.is_(None)
+    ).all()
+
+    grupos_ocupados = {
+        reg.id_grupo
+        for reg in registros_existentes
+        if reg.id_grupo is not None and reg.id_docente_asignatura != asignacion.id_docente_asignatura
+    }
+
+    if asignacion.id_grupo is not None:
+        grupos_ocupados.add(asignacion.id_grupo)
+    else:
+        for grupo_tuple in grupos_relacionados:
+            grupo_id = grupo_tuple[0]
+            if grupo_id not in grupos_ocupados:
+                asignacion.id_grupo = grupo_id
+                asignacion.id_grado = grado_id
+                asignacion.id_anio_lectivo = anio_id
+                grupos_ocupados.add(grupo_id)
+                cambios = True
+                break
+
+    for grupo_tuple in grupos_relacionados:
+        nuevo_grupo_id = grupo_tuple[0]
+        if nuevo_grupo_id in grupos_ocupados:
+            continue
+
+        existe = next(
+            (
+                reg
+                for reg in registros_existentes
+                if reg.id_grupo == nuevo_grupo_id
+            ),
+            None,
+        )
+
+        if existe is None:
+            existe = db.query(DocenteAsignatura).filter(
+                DocenteAsignatura.id_persona_docente == asignacion.id_persona_docente,
+                DocenteAsignatura.id_asignatura == asignacion.id_asignatura,
+                DocenteAsignatura.id_grado == grado_id,
+                DocenteAsignatura.id_grupo == nuevo_grupo_id,
+                DocenteAsignatura.id_anio_lectivo == anio_id,
+                DocenteAsignatura.fecha_eliminacion.is_(None)
+            ).first()
+
+        if existe:
+            grupos_ocupados.add(nuevo_grupo_id)
+            continue
+
+        nuevo_registro = DocenteAsignatura(
+            id_persona_docente=asignacion.id_persona_docente,
+            id_asignatura=asignacion.id_asignatura,
+            id_grado=grado_id,
+            id_grupo=nuevo_grupo_id,
+            id_anio_lectivo=anio_id
+        )
+        db.add(nuevo_registro)
+        registros_existentes.append(nuevo_registro)
+        grupos_ocupados.add(nuevo_grupo_id)
+        nuevos_creados += 1
+
+    return cambios, nuevos_creados
 
 
 # ==============================
@@ -165,6 +263,7 @@ def obtener_clase_con_notas_y_fallas(
             Persona.id_persona,
             Persona.nombre,
             Persona.apellido,
+            Persona.numero_identificacion,
             Persona.foto,
             Calificacion.id_calificacion.label('id_calificacion'),
             Calificacion.calificacion_numerica.label('calificacion_numerica'),
@@ -211,7 +310,15 @@ def obtener_clase_con_notas_y_fallas(
     else:
         stmt_estudiantes = stmt_estudiantes.filter(Matricula.id_grupo == da.id_grupo)
     
-    stmt_estudiantes = stmt_estudiantes.group_by(Persona.id_persona).order_by(Persona.apellido, Persona.nombre)
+    stmt_estudiantes = stmt_estudiantes.group_by(
+        Persona.id_persona,
+        Persona.nombre,
+        Persona.apellido,
+        Persona.numero_identificacion,
+        Persona.foto,
+        Calificacion.id_calificacion,
+        Calificacion.calificacion_numerica
+    ).order_by(Persona.apellido, Persona.nombre)
 
     estudiantes_data = db.execute(stmt_estudiantes).all()
 
@@ -232,6 +339,7 @@ def obtener_clase_con_notas_y_fallas(
                 id_persona=e.id_persona,
                 nombre=e.nombre,
                 apellido=e.apellido,
+                numero_identificacion=e.numero_identificacion,
                 foto=e.foto,
                 id_calificacion=e.id_calificacion,
                 calificacion_actual=float(e.calificacion_numerica) if e.calificacion_numerica else None,
@@ -247,7 +355,9 @@ def listar_asignaciones(
     docente_id: Optional[int] = Query(None, alias="persona_docente_id"),
     asignatura_id: Optional[int] = Query(None),
     grado_id: Optional[int] = Query(None),
+    grupo_id: Optional[int] = Query(None),
     anio_lectivo_id: Optional[int] = Query(None),
+    buscar: Optional[str] = Query(None, description="Buscar por nombre, apellido o identificación del docente"),
     db: Session = Depends(get_db),
     user = Depends(require_permission("/docente-asignatura", "ver"))
 ):
@@ -289,6 +399,24 @@ def listar_asignaciones(
             query = query.filter(DocenteAsignatura.id_grado == grado_id)
         if anio_lectivo_id:
             query = query.filter(DocenteAsignatura.id_anio_lectivo == anio_lectivo_id)
+
+        if grupo_id is not None:
+            query = query.filter(
+                or_(
+                    DocenteAsignatura.id_grupo == grupo_id,
+                    DocenteAsignatura.id_grupo.is_(None)
+                )
+            )
+
+        if buscar:
+            termino = f"%{buscar.strip()}%"
+            query = query.filter(
+                or_(
+                    PersonaDocente.nombre.ilike(termino),
+                    PersonaDocente.apellido.ilike(termino),
+                    PersonaDocente.numero_identificacion.ilike(termino)
+                )
+            )
 
         raw_results = query.all()
 
@@ -402,6 +530,7 @@ def obtener_clase_completa(
             id_persona=e.id_persona,
             nombre=e.nombre,
             apellido=e.apellido,
+            numero_identificacion=e.numero_identificacion,
             foto=e.foto
         ) for e in estudiantes]
     )
@@ -462,50 +591,121 @@ def crear_asignacion(
         if not anio_lectivo:
             raise HTTPException(400, "Año lectivo no encontrado o no está activo")
 
-    # ✅ Verificar si ya existe (evitar duplicados) - manejo de NULL correcto
+    # ✅ Intentar reutilizar una asignación existente que tenga campos vacíos
+    reuse_query = db.query(DocenteAsignatura).filter(
+        DocenteAsignatura.id_asignatura == data.id_asignatura,
+        DocenteAsignatura.fecha_eliminacion.is_(None)
+    )
+
+    if data.id_persona_docente is not None:
+        reuse_query = reuse_query.filter(DocenteAsignatura.id_persona_docente == data.id_persona_docente)
+    else:
+        reuse_query = reuse_query.filter(DocenteAsignatura.id_persona_docente.is_(None))
+
+    reuse_query = reuse_query.filter(
+        or_(DocenteAsignatura.id_grado == data.id_grado, DocenteAsignatura.id_grado.is_(None))
+    ).filter(
+        or_(DocenteAsignatura.id_grupo == data.id_grupo, DocenteAsignatura.id_grupo.is_(None))
+    ).filter(
+        or_(DocenteAsignatura.id_anio_lectivo == data.id_anio_lectivo, DocenteAsignatura.id_anio_lectivo.is_(None))
+    ).order_by(DocenteAsignatura.id_docente_asignatura.asc())
+
+    existente_complementable = reuse_query.first()
+
+    if existente_complementable:
+        cambios = False
+
+        if existente_complementable.id_grado is None and data.id_grado is not None:
+            existente_complementable.id_grado = data.id_grado
+            cambios = True
+
+        if existente_complementable.id_grupo is None and data.id_grupo is not None:
+            existente_complementable.id_grupo = data.id_grupo
+            cambios = True
+
+        if existente_complementable.id_anio_lectivo is None and data.id_anio_lectivo is not None:
+            existente_complementable.id_anio_lectivo = data.id_anio_lectivo
+            cambios = True
+
+        expandio, creados = _expandir_asignacion_a_grupos(
+            db,
+            existente_complementable,
+            fallback_grado=data.id_grado,
+            fallback_anio=data.id_anio_lectivo,
+        )
+        if expandio:
+            cambios = True
+
+        if cambios or creados:
+            existente_complementable.fecha_actualizacion = datetime.now()
+            db.commit()
+            db.refresh(existente_complementable)
+            return {
+                "mensaje": "Asignación actualizada aprovechando registro existente",
+                "id": existente_complementable.id_docente_asignatura,
+                "actualizacion_parcial": True,
+                "registros_adicionales": creados
+            }
+
+    # ✅ Verificar si ya existe (evitar duplicados exactos)
     existente_query = db.query(DocenteAsignatura).filter(
         DocenteAsignatura.id_asignatura == data.id_asignatura,
         DocenteAsignatura.fecha_eliminacion.is_(None)
     )
-    
+
     if data.id_persona_docente is not None:
         existente_query = existente_query.filter(DocenteAsignatura.id_persona_docente == data.id_persona_docente)
     else:
         existente_query = existente_query.filter(DocenteAsignatura.id_persona_docente.is_(None))
-    
+
     if data.id_grado is not None:
         existente_query = existente_query.filter(DocenteAsignatura.id_grado == data.id_grado)
     else:
         existente_query = existente_query.filter(DocenteAsignatura.id_grado.is_(None))
-    
+
     if data.id_grupo is not None:
         existente_query = existente_query.filter(DocenteAsignatura.id_grupo == data.id_grupo)
     else:
         existente_query = existente_query.filter(DocenteAsignatura.id_grupo.is_(None))
-    
+
     if data.id_anio_lectivo is not None:
         existente_query = existente_query.filter(DocenteAsignatura.id_anio_lectivo == data.id_anio_lectivo)
     else:
         existente_query = existente_query.filter(DocenteAsignatura.id_anio_lectivo.is_(None))
-    
+
     existente = existente_query.first()
-    
+
     if existente:
         raise HTTPException(400, "Esta asignación ya existe")
 
-    # ✅ Crear nueva asignación con upsert
+    # ✅ Crear nueva asignación
     nueva = DocenteAsignatura(
         id_persona_docente=data.id_persona_docente,
         id_asignatura=data.id_asignatura,
         id_grado=data.id_grado,
-        id_grupo=data.id_grupo,  # Puede ser NULL
+        id_grupo=data.id_grupo,
         id_anio_lectivo=data.id_anio_lectivo
     )
     db.add(nueva)
     db.commit()
     db.refresh(nueva)
-    
-    return {"mensaje": "Asignación creada exitosamente", "id": nueva.id_docente_asignatura}
+
+    expandio, creados = _expandir_asignacion_a_grupos(
+        db,
+        nueva,
+        fallback_grado=data.id_grado,
+        fallback_anio=data.id_anio_lectivo,
+    )
+    if expandio or creados:
+        nueva.fecha_actualizacion = datetime.now()
+        db.commit()
+        db.refresh(nueva)
+
+    return {
+        "mensaje": "Asignación creada exitosamente",
+        "id": nueva.id_docente_asignatura,
+        "registros_adicionales": creados if (expandio or creados) else 0
+    }
 
 
 # 5️⃣ ACTUALIZAR ASIGNACIÓN
@@ -637,10 +837,15 @@ def actualizar_asignacion(
 
     for k, v in updates.items():
         setattr(da, k, v)
+
+    expandio, creados = _expandir_asignacion_a_grupos(db, da)
     da.fecha_actualizacion = datetime.now()
     db.commit()
 
-    return {"mensaje": "Actualizada"}
+    mensaje = {"mensaje": "Actualizada"}
+    if creados:
+        mensaje["registros_adicionales"] = creados
+    return mensaje
 
 
 # 6️⃣ ELIMINAR ASIGNACIÓN (SOFT)
@@ -685,6 +890,71 @@ def eliminar_asignacion(
     db.commit()
 
     return {"mensaje": "Eliminada"}
+
+
+# 7️⃣ NORMALIZAR DATOS (completar campos faltantes y detectar duplicados)
+@router.post("/normalizar", response_model=dict)
+def normalizar_docente_asignatura(
+    db: Session = Depends(get_db),
+    user = Depends(require_permission("/docente-asignatura", "editar"))
+):
+    asignaciones = db.query(DocenteAsignatura).filter(DocenteAsignatura.fecha_eliminacion.is_(None)).all()
+
+    actualizados = 0
+    nuevos_creados = 0
+    duplicados: List[int] = []
+    llaves: dict = {}
+
+    for asignacion in asignaciones:
+        cambios = False
+
+        if asignacion.id_grupo is not None and (asignacion.id_grado is None or asignacion.id_anio_lectivo is None):
+            grupo = db.query(Grupo).filter(Grupo.id_grupo == asignacion.id_grupo, Grupo.fecha_eliminacion.is_(None)).first()
+            if grupo:
+                if asignacion.id_grado is None:
+                    asignacion.id_grado = grupo.id_grado
+                    cambios = True
+                if asignacion.id_anio_lectivo is None:
+                    asignacion.id_anio_lectivo = grupo.id_anio_lectivo
+                    cambios = True
+
+        expandio, creados = _expandir_asignacion_a_grupos(
+            db,
+            asignacion,
+            fallback_grado=asignacion.id_grado,
+            fallback_anio=asignacion.id_anio_lectivo,
+        )
+        if expandio:
+            cambios = True
+        if creados:
+            nuevos_creados += creados
+
+        if cambios:
+            asignacion.fecha_actualizacion = datetime.now()
+            actualizados += 1
+
+        llave = (
+            asignacion.id_persona_docente or 0,
+            asignacion.id_asignatura,
+            asignacion.id_grado or 0,
+            asignacion.id_grupo or 0,
+            asignacion.id_anio_lectivo or 0
+        )
+
+        if llave in llaves:
+            duplicados.append(asignacion.id_docente_asignatura)
+        else:
+            llaves[llave] = asignacion.id_docente_asignatura
+
+    if actualizados or nuevos_creados:
+        db.commit()
+
+    return {
+        "mensaje": "Normalización completada",
+        "registros_actualizados": actualizados,
+        "registros_creados": nuevos_creados,
+        "registros_posible_duplicado": duplicados
+    }
 
 
 # 7️⃣ LISTAR DOCENTES DISPONIBLES POR GRADO/ASIGNATURA/AÑO (DISTINCT)

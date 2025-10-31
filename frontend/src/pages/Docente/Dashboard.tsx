@@ -15,7 +15,7 @@ const DocenteDashboard: React.FC = () => {
   // Verificar autenticación y que sea docente
   React.useEffect(() => {
     if (!state.user.isAuthenticated) {
-      navigate('/login');
+      navigate('/');
       return;
     }
     
