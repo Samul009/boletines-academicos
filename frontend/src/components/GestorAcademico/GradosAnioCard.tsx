@@ -18,7 +18,7 @@ interface GradosAnioCardProps {
   asignaturasCount: number;
   gruposCount: number;
   docentesCount: number;
-  onBoletin: (grado: Grado, anio: AnioLectivo) => void;
+  onBoletin?: (grado: Grado, anio: AnioLectivo) => void;
   onAsignaturas: (grado: Grado, anio: AnioLectivo) => void;
   onCrearGrupo: (grado: Grado, anio: AnioLectivo) => void;
   onCardClick: (grado: Grado, anio: AnioLectivo) => void;
@@ -40,6 +40,19 @@ const GradosAnioCard: React.FC<GradosAnioCardProps> = ({
      (gruposCount > 0 ? 1 : 0) + 
      (docentesCount > 0 ? 1 : 0)) / 3 * 100
   );
+
+  const handleBoletinClick = () => {
+    if (onBoletin) {
+      onBoletin(grado, anio);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('section', 'generar-boletines');
+    params.set('grado', String(grado.id_grado));
+    params.set('anio', String(anio.id_anio_lectivo));
+    window.location.href = `/admin/dashboard?${params.toString()}`;
+  };
 
   return (
     <div 
@@ -138,7 +151,7 @@ const GradosAnioCard: React.FC<GradosAnioCardProps> = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onBoletin(grado, anio);
+              handleBoletinClick();
             }}
             style={{
               flex: 1,

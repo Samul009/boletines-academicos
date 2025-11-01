@@ -140,10 +140,6 @@ const ReporteNotasPanel: React.FC = () => {
   const [filtroBusqueda, setFiltroBusqueda] = useState<string>('');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'con-nota' | 'sin-nota'>('todos');
 
-  const puedeEditarNotas = useMemo(() => {
-    return permissions.canEditNotas(anioLectivoActivo?.estado);
-  }, [anioLectivoActivo?.estado, permissions]);
-
   const loadAnioLectivoActivo = useCallback(async (): Promise<Nullable<AnioLectivoActivoInfo>> => {
     setLoadingAnio(true);
     try {
@@ -536,6 +532,51 @@ const ReporteNotasPanel: React.FC = () => {
     }
   }, [selectedAsignacionId, selectedPeriodoId, loadEstudiantes]);
 
+  const asignacionSeleccionada = useMemo(
+    () => asignaciones.find((a) => a.id_docente_asignatura === selectedAsignacionId) || null,
+    [asignaciones, selectedAsignacionId]
+  );
+
+  const periodoSeleccionado = useMemo(
+    () => periodos.find((p) => p.id_periodo === selectedPeriodoId) || null,
+    [periodos, selectedPeriodoId]
+  );
+
+  const obtenerEstadoValor = (estado: any): string => {
+    if (!estado) return '';
+    if (typeof estado === 'string') return estado;
+    if (typeof estado === 'object') {
+      if (typeof estado.nombre === 'string') return estado.nombre;
+      if (typeof estado.estado === 'string') return estado.estado;
+    }
+    return '';
+  };
+
+  const anioEstadoValor = obtenerEstadoValor(anioLectivoActivo?.estado);
+  const periodoEstadoValor = obtenerEstadoValor(periodoSeleccionado?.estado);
+  const periodoSeleccionadoEstado = periodoEstadoValor;
+  const puedeCambiarPeriodo = permissions.canOverridePeriodo();
+  const puedeEditarNotas = useMemo(
+    () => permissions.canEditNotas(anioEstadoValor, periodoEstadoValor),
+    [permissions, anioEstadoValor, periodoEstadoValor]
+  );
+  const tienePermisoBase = permissions.hasAnyPermission(['editar_notas', 'gestionar_notas', 'docente']);
+  const anioEstadoNormalizado = anioEstadoValor.toLowerCase();
+  const periodoEstadoNormalizado = periodoEstadoValor.toLowerCase();
+  const mensajeBloqueo = useMemo(() => {
+    if (puedeEditarNotas) return '';
+    if (!tienePermisoBase) {
+      return 'Tu perfil no tiene permisos para registrar calificaciones.';
+    }
+    if (periodoEstadoNormalizado && periodoEstadoNormalizado !== 'activo') {
+      return 'Solo el período activo permite registrar notas con tu rol actual.';
+    }
+    if (['finalizado', 'cerrado'].includes(anioEstadoNormalizado)) {
+      return 'El año lectivo actual está cerrado para edición de notas.';
+    }
+    return 'El ingreso de notas está bloqueado para su perfil o el período seleccionado.';
+  }, [puedeEditarNotas, tienePermisoBase, periodoEstadoNormalizado, anioEstadoNormalizado]);
+
   const handleSelectAsignacion = async (id: number) => {
     setSelectedAsignacionId(id);
     setSelectedPeriodoId(null);
@@ -591,6 +632,10 @@ const ReporteNotasPanel: React.FC = () => {
 
   const guardarNota = async (estudiante: EstudianteNotaRow): Promise<boolean> => {
     if (!selectedAsignacionId || !selectedPeriodoId || !anioLectivoActivo?.id_anio_lectivo || !docente) {
+      return false;
+    }
+
+    if (!puedeEditarNotas) {
       return false;
     }
 
@@ -656,7 +701,10 @@ const ReporteNotasPanel: React.FC = () => {
   };
 
   const guardarNotasSeleccionadas = async () => {
-    if (!puedeEditarNotas) return;
+    if (!puedeEditarNotas) {
+      alert(mensajeBloqueo || 'No puedes registrar notas en este período.');
+      return;
+    }
 
     const estudiantesConCambios = estudiantes.filter((est) => est.tieneCambios);
     if (!estudiantesConCambios.length) {
@@ -707,16 +755,6 @@ const ReporteNotasPanel: React.FC = () => {
       return true;
     });
   }, [estudiantes, filtroBusqueda, filtroEstado]);
-
-  const asignacionSeleccionada = useMemo(
-    () => asignaciones.find((a) => a.id_docente_asignatura === selectedAsignacionId) || null,
-    [asignaciones, selectedAsignacionId]
-  );
-
-  const periodoSeleccionado = useMemo(
-    () => periodos.find((p) => p.id_periodo === selectedPeriodoId) || null,
-    [periodos, selectedPeriodoId]
-  );
 
   const handleBuscarKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (event) => {
     if (event.key === 'Enter') {
@@ -864,15 +902,26 @@ const ReporteNotasPanel: React.FC = () => {
                   id="periodo-select"
                   value={selectedPeriodoId ?? ''}
                   onChange={(event) => handlePeriodoChange(Number(event.target.value))}
+                  disabled={!puedeCambiarPeriodo}
                 >
                   <option value="">Seleccione un período</option>
                   {periodos.map((periodo) => (
-                    <option key={periodo.id_periodo} value={periodo.id_periodo}>
+                    <option
+                      key={periodo.id_periodo}
+                      value={periodo.id_periodo}
+                      disabled={!puedeCambiarPeriodo && periodo.estado !== 'activo'}
+                    >
                       {periodo.nombre_periodo} ({periodo.estado})
                     </option>
                   ))}
                 </select>
               </div>
+
+              {!puedeCambiarPeriodo && (
+                <small className="text-muted" style={{ display: 'block', marginTop: '6px' }}>
+                  Tu rol solo permite ingresar notas en el período activo.
+                </small>
+              )}
 
               {periodoActivoId && periodoActivoId === selectedPeriodoId && (
                 <span className="status-pill status-pill--success">Período detectado automáticamente</span>
@@ -968,9 +1017,9 @@ const ReporteNotasPanel: React.FC = () => {
             </button>
           </div>
 
-          {!puedeEditarNotas && (
+          {!!mensajeBloqueo && (
             <div className="alert alert-info">
-              El ingreso de notas está bloqueado para su perfil o el año lectivo actual.
+              {mensajeBloqueo}
             </div>
           )}
 

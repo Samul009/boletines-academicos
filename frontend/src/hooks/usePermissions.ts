@@ -6,10 +6,15 @@ import { SYSTEM_OPTIONS } from '../config/options';
 export const usePermissions = () => {
   const { state } = useAppContext();
   const userPermissions = state.user.permissions;
+  const normalizedRoles = (state.user.roles || []).map(role => role.toLowerCase());
 
   // Verificar si el usuario tiene un permiso específico
   const hasPermission = (permission: string): boolean => {
     return userPermissions.includes(permission);
+  };
+
+  const hasRole = (role: string): boolean => {
+    return normalizedRoles.includes(role.toLowerCase());
   };
 
   // Verificar múltiples permisos (AND - todos deben estar presentes)
@@ -60,21 +65,34 @@ export const usePermissions = () => {
 
   // Verificar si el usuario es desarrollador (puede hacer todo)
   const isDeveloper = (): boolean => {
-    return state.user.roles?.includes('desarrollador') || hasPermission('all_access');
+    if (hasRole('desarrollador') || hasRole('developer') || hasRole('dev')) {
+      return true;
+    }
+    return hasPermission('all_access');
   };
 
+  const isClientAdmin = (): boolean => hasRole('admin');
+
   // Verificar si puede editar notas
-  const canEditNotas = (anioLectivoEstado?: string): boolean => {
-    // Desarrollador puede editar siempre
-    if (isDeveloper()) return true;
-    
+  const canEditNotas = (anioLectivoEstado?: string, periodoEstado?: string): boolean => {
+    // Roles con override completo
+    if (isDeveloper() || isClientAdmin()) return true;
+
     // Si el año lectivo ha finalizado, no se puede editar
     if (anioLectivoEstado === 'finalizado' || anioLectivoEstado === 'cerrado') {
       return false;
     }
-    
+
+    if (periodoEstado && periodoEstado !== 'activo') {
+      return false;
+    }
+
     // Verificar permisos de edición
     return hasAnyPermission(['editar_notas', 'gestionar_notas', 'docente']);
+  };
+
+  const canOverridePeriodo = (): boolean => {
+    return isDeveloper() || isClientAdmin();
   };
 
   // Verificar si puede eliminar registros
@@ -87,6 +105,7 @@ export const usePermissions = () => {
     hasPermission,
     hasAllPermissions,
     hasAnyPermission,
+    hasRole,
     canAccessOption,
 
     // Filtrado de opciones
@@ -99,7 +118,9 @@ export const usePermissions = () => {
 
     // Permisos especiales
     isDeveloper,
+    isClientAdmin,
     canEditNotas,
+    canOverridePeriodo,
     canDelete,
 
     // Datos del usuario

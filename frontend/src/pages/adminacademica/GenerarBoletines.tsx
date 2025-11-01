@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useApi } from '../../hooks/useApi';
+import { usePermissions } from '../../hooks/usePermissions';
+import { useAppContext } from '../../context';
 import PreviewBoletin, { generarHTMLBoletin } from './PreviewBoletin';
 import './GenerarBoletines.css';
 
@@ -36,6 +39,21 @@ interface BoletinCompleto {
 
 const GenerarBoletines: React.FC = () => {
   const { get } = useApi();
+  const permissions = usePermissions();
+  const location = useLocation();
+  const { state } = useAppContext();
+
+  const apiBaseUrl = useMemo(() => {
+    const base = state.systemInfo?.apiUrl || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    return base.replace(/\/$/, '');
+  }, [state.systemInfo?.apiUrl]);
+  const canOverridePeriodo = permissions.canOverridePeriodo();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const urlGradoId = searchParams.get('grado');
+  const urlAnioId = searchParams.get('anio');
+  const urlJornadaId = searchParams.get('jornada');
+  const urlGrupoId = searchParams.get('grupo');
+  const urlPeriodoId = searchParams.get('periodo');
   const [generando, setGenerando] = useState(false);
   
   // Filtros en cascada
@@ -55,6 +73,17 @@ const GenerarBoletines: React.FC = () => {
   const [boletines, setBoletines] = useState<BoletinCompleto[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [boletinPreview, setBoletinPreview] = useState<BoletinCompleto | null>(null);
+  const prefillAppliedRef = useRef({ anio: false, grado: false, jornada: false, grupo: false, periodo: false });
+
+  const normalizarEstado = (valor: any): string => {
+    if (!valor) return '';
+    if (typeof valor === 'string') return valor.toLowerCase();
+    if (typeof valor === 'object') {
+      if (typeof valor.estado === 'string') return valor.estado.toLowerCase();
+      if (typeof valor.nombre === 'string') return valor.nombre.toLowerCase();
+    }
+    return '';
+  };
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -103,6 +132,46 @@ const GenerarBoletines: React.FC = () => {
       setBoletines([]);
     }
   }, [selectedGrupo, selectedAnioLectivo]);
+
+  useEffect(() => {
+    if (!prefillAppliedRef.current.anio && urlAnioId && aniosLectivos.length) {
+      const match = aniosLectivos.find((a: any) => a.id_anio_lectivo === Number(urlAnioId));
+      if (match) {
+        setSelectedAnioLectivo(match.id_anio_lectivo);
+        prefillAppliedRef.current.anio = true;
+      }
+    }
+  }, [aniosLectivos, urlAnioId]);
+
+  useEffect(() => {
+    if (!prefillAppliedRef.current.grado && urlGradoId && grados.length) {
+      const match = grados.find((g: any) => g.id_grado === Number(urlGradoId));
+      if (match) {
+        setSelectedGrado(match.id_grado);
+        prefillAppliedRef.current.grado = true;
+      }
+    }
+  }, [grados, urlGradoId]);
+
+  useEffect(() => {
+    if (!prefillAppliedRef.current.jornada && urlJornadaId && jornadas.length) {
+      const match = jornadas.find((j: any) => j.id_jornada === Number(urlJornadaId));
+      if (match) {
+        setSelectedJornada(match.id_jornada);
+        prefillAppliedRef.current.jornada = true;
+      }
+    }
+  }, [jornadas, urlJornadaId]);
+
+  useEffect(() => {
+    if (!prefillAppliedRef.current.grupo && urlGrupoId && grupos.length) {
+      const match = grupos.find((g: any) => g.id_grupo === Number(urlGrupoId));
+      if (match) {
+        setSelectedGrupo(match.id_grupo);
+        prefillAppliedRef.current.grupo = true;
+      }
+    }
+  }, [grupos, urlGrupoId]);
 
   const loadGrados = async () => {
     try {
@@ -159,6 +228,35 @@ const GenerarBoletines: React.FC = () => {
         (p: any) => p.id_anio_lectivo === selectedAnioLectivo && !p.fecha_eliminacion
       );
       setPeriodos(periodosFiltrados);
+
+      if (periodosFiltrados.length) {
+        const periodoActivo = periodosFiltrados.find((p: any) => normalizarEstado(p.estado) === 'activo');
+        const periodoUrlValido = urlPeriodoId ? periodosFiltrados.find((p: any) => p.id_periodo === Number(urlPeriodoId)) : null;
+        const periodoUrlEstado = periodoUrlValido ? normalizarEstado(periodoUrlValido.estado) : '';
+
+        setSelectedPeriodo((prev) => {
+          if (prev && periodosFiltrados.some((p: any) => p.id_periodo === prev)) {
+            const prevEstado = normalizarEstado(periodosFiltrados.find((p: any) => p.id_periodo === prev)?.estado);
+            if (canOverridePeriodo || prevEstado === 'activo') {
+              return prev;
+            }
+          }
+
+          if (periodoUrlValido) {
+            if (canOverridePeriodo || periodoUrlEstado === 'activo') {
+              return periodoUrlValido.id_periodo;
+            }
+          }
+
+          if (periodoActivo) {
+            return periodoActivo.id_periodo;
+          }
+
+          return canOverridePeriodo ? periodosFiltrados[0].id_periodo : null;
+        });
+      } else {
+        setSelectedPeriodo(null);
+      }
     } catch (error) {
       console.error('Error cargando períodos:', error);
     }
@@ -186,9 +284,20 @@ const GenerarBoletines: React.FC = () => {
     }
   };
 
+  const periodoActivo = useMemo(() => {
+    return periodos.find((p: any) => normalizarEstado(p.estado) === 'activo') || null;
+  }, [periodos]);
+
   const generarBoletines = async () => {
     if (!selectedGrupo || !selectedPeriodo || !selectedAnioLectivo || !selectedGrado || !selectedJornada) {
       alert('Por favor complete todos los filtros');
+      return;
+    }
+
+    const periodoActual = periodos.find((p: any) => p.id_periodo === selectedPeriodo);
+    const estadoPeriodo = periodoActual ? normalizarEstado(periodoActual.estado) : '';
+    if (!canOverridePeriodo && estadoPeriodo !== 'activo') {
+      alert('Solo se pueden generar boletines para el período activo.');
       return;
     }
 
@@ -334,6 +443,45 @@ const GenerarBoletines: React.FC = () => {
       setBoletines([]);
     } finally {
       setGenerando(false);
+    }
+  };
+
+  const descargarBoletinDocx = async () => {
+    if (!selectedGrupo || !selectedPeriodo || !selectedAnioLectivo || !selectedGrado || !selectedJornada) {
+      alert('Completa los filtros antes de descargar el boletín.');
+      return;
+    }
+
+    if (!canOverridePeriodo && (!periodoActivo || selectedPeriodo !== periodoActivo.id_periodo)) {
+      alert('Solo puedes descargar boletines del período activo.');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${apiBaseUrl}/boletines/grupos/${selectedGrupo}/periodo/${selectedPeriodo}/docx`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || 'Error descargando el boletín.');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const periodoActualNombre = periodos.find((p: any) => p.id_periodo === selectedPeriodo)?.nombre_periodo || 'periodo';
+      const grupoCodigo = grupos.find((g: any) => g.id_grupo === selectedGrupo)?.codigo_grupo || 'grupo';
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Boletines_${grupoCodigo}_${periodoActualNombre}.docx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error('Error descargando boletín:', error);
+      alert(error?.message || 'No fue posible descargar el boletín en este momento.');
     }
   };
 
@@ -507,15 +655,29 @@ const GenerarBoletines: React.FC = () => {
                 setSelectedPeriodo(parseInt(e.target.value) || null);
                 setBoletines([]);
               }}
-              disabled={!selectedAnioLectivo}
+              disabled={!selectedAnioLectivo || periodos.length === 0 || (!canOverridePeriodo && !periodoActivo)}
             >
               <option value="">Seleccione período...</option>
-              {periodos.map((periodo) => (
-                <option key={periodo.id_periodo} value={periodo.id_periodo}>
-                  {periodo.nombre_periodo}
-                </option>
-              ))}
+              {periodos.map((periodo) => {
+                const estado = normalizarEstado(periodo.estado);
+                const disabled = !canOverridePeriodo && estado !== 'activo';
+                return (
+                  <option key={periodo.id_periodo} value={periodo.id_periodo} disabled={disabled}>
+                    {periodo.nombre_periodo} {estado ? `(${estado})` : ''}
+                  </option>
+                );
+              })}
             </select>
+            {!canOverridePeriodo && periodoActivo && (
+              <small className="text-muted" style={{ display: 'block', marginTop: '6px' }}>
+                Solo se generarán boletines del período activo: <strong>{periodoActivo.nombre_periodo}</strong>.
+              </small>
+            )}
+            {!canOverridePeriodo && selectedAnioLectivo && !periodoActivo && (
+              <small className="text-danger" style={{ display: 'block', marginTop: '6px' }}>
+                No existe un período activo en este año lectivo. Póngase en contacto con la coordinación académica.
+              </small>
+            )}
           </div>
         </div>
 
@@ -523,10 +685,19 @@ const GenerarBoletines: React.FC = () => {
           <button
             className="btn btn-primary"
             onClick={generarBoletines}
-            disabled={!selectedGrupo || !selectedPeriodo || !selectedAnioLectivo || !selectedGrado || !selectedJornada || generando}
+            disabled={!selectedGrupo || !selectedPeriodo || !selectedAnioLectivo || !selectedGrado || !selectedJornada || generando || (!canOverridePeriodo && (!periodoActivo || selectedPeriodo !== periodoActivo.id_periodo))}
           >
             <span className="material-icons">{generando ? 'hourglass_empty' : 'refresh'}</span>
             {generando ? 'Generando...' : 'Generar Boletines'}
+          </button>
+
+          <button
+            className="btn btn-outline-primary"
+            onClick={descargarBoletinDocx}
+            disabled={!selectedGrupo || !selectedPeriodo || !selectedAnioLectivo || !selectedGrado || !selectedJornada || (!canOverridePeriodo && (!periodoActivo || selectedPeriodo !== periodoActivo.id_periodo))}
+          >
+            <span className="material-icons">description</span>
+            Descargar Word
           </button>
 
           {boletines.length > 0 && (

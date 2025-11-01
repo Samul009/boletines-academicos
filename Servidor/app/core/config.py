@@ -1,5 +1,6 @@
 import os
 from pydantic_settings import BaseSettings
+from pathlib import Path
 from functools import lru_cache
 
 class Settings(BaseSettings):
@@ -12,6 +13,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
         "mysql+pymysql://root:@localhost/boletines_academicos"  # Fallback para desarrollo local
+    )
+
+    BOLETIN_TEMPLATE_PATH: str = os.getenv(
+        "BOLETIN_TEMPLATE_PATH",
+        str(Path(__file__).resolve().parent.parent.parent / "BOLETINES TERCERO PRIMER PERIODO REVISADO.docx")
     )
 
     # Configuración de correo (SendGrid + SMTP)

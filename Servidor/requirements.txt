@@ -14,4 +14,7 @@ sendgrid
 pandas 
 jinja2     
 certifi
+docxtpl
+python-docx
+lxml
   

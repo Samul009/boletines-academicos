@@ -25,6 +25,7 @@ from app.routes import imagen_route
 from app.routes import notificacion_route
 from app.routes import recuperacion_contrasena_route
 from app.routes import GradoAsignatura_route
+from app.routes import boletin_route
 
 from app.routes import auth
 from app.core.database import Base, engine
@@ -64,7 +65,7 @@ async def startup_event():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^(http://localhost:\d+|http://127\.0\.0\.1:\d+|http://192\.168\.\d+\.\d+:\d+|https://.*\.netlify\.app|https://.*\.vercel\.app|https://.*\.trycloudflare\.com|https://.*\.ngrok\.io|https://.*\.ngrok-free\.app|https://.*\.ngrok\.app)$",
+    allow_origin_regex=r"^(http://localhost:\d+|http://127\.0\.0\.1:\d+|http://192\.168\.\d+\.\d+:\d+|http://10\.101\.\d+\.\d+:\d+|https://.*\.netlify\.app|https://.*\.vercel\.app|https://.*\.trycloudflare\.com|https://.*\.ngrok\.io|https://.*\.ngrok-free\.app|https://.*\.ngrok\.app)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -103,7 +104,16 @@ app.include_router(imagen_route.router)
 app.include_router(notificacion_route.router)
 app.include_router(recuperacion_contrasena_route.router)
 app.include_router(GradoAsignatura_route.router)
+app.include_router(boletin_route.router)
 
 
 
  
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app", 
+        host="0.0.0.0",  # Escuchar en todas las interfaces de red
+        port=8000, 
+        reload=True
+    )
